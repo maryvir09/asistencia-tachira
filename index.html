@@ -76,6 +76,7 @@ textarea{width:100%;min-height:180px;font-family:var(--f-mono);font-size:13px;ba
 .nota{font-size:13px;color:var(--muted);margin:0}
 a.btn{text-decoration:none;display:inline-block}
 .btn.wa{background:var(--ok);border-color:var(--ok);color:var(--panel)}
+.btn.correo{background:var(--azul);border-color:var(--azul);color:var(--panel)}
 .vacio{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;gap:8px}
 @media (prefers-reduced-motion:no-preference){.aviso{animation:entra .25s ease-out}@keyframes entra{from{transform:scale(.97)}to{transform:none}}}
 </style>
@@ -125,7 +126,7 @@ a.btn{text-decoration:none;display:inline-block}
     <summary>Reporte del día (porcentaje y lista)</summary>
     <div class="campos">
       <p class="nota" id="r-envio"></p>
-      <div class="fila"><a class="btn chico wa" id="b-wa" href="https://wa.me/" target="_blank" rel="noopener">Enviar por WhatsApp</a><button class="btn chico" id="b-copiar" type="button">Copiar texto</button><button class="btn chico" id="b-enviar" type="button" hidden>Enviar a la hoja de Google</button></div>
+      <div class="fila"><a class="btn chico wa" id="b-wa" href="https://wa.me/" target="_blank" rel="noopener">Enviar por WhatsApp</a><a class="btn chico correo" id="b-correo" href="mailto:">Enviar por correo</a><button class="btn chico" id="b-copiar" type="button">Copiar texto</button><button class="btn chico" id="b-enviar" type="button" hidden>Enviar a la hoja de Google</button></div>
       <textarea id="t-reporte" readonly aria-label="Reporte"></textarea>
     </div>
   </details>
@@ -134,9 +135,9 @@ a.btn{text-decoration:none;display:inline-block}
     <summary>Ajustes de la escuela</summary>
     <form class="campos" id="f-ajustes">
       <label>Hora de entrada (después de esta hora cuenta como tarde)<input id="a-hora" type="time"></label>
+      <label>Correo de la institución (recibe el reporte)<input id="a-correo" type="email" autocomplete="off" placeholder="escuela@gmail.com"></label>
       <label>WhatsApp que recibe el reporte (director o supervisor)<input id="a-wa" type="tel" inputmode="tel" autocomplete="off" placeholder="0414-1234567"></label>
       <label>Hoja de Google (opcional, solo si la escuela tiene una)<input id="a-url" type="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec"></label>
-      <label>Correo para el resumen de la hoja de Google (opcional)<input id="a-correo" type="email" autocomplete="off"></label>
       <div class="fila"><button class="btn chico" type="submit">Guardar</button><span class="nota" id="a-ok"></span></div>
     </form>
   </details>
@@ -215,11 +216,15 @@ function leerQR(txt){
 var ultimo = {};   // ci -> ms del último escaneo (evita dobles lecturas seguidas)
 function registrar(dato, origen){
   var ahora = new Date(), ms = ahora.getTime(), fecha = hoyISO(ahora), hm = horaHM(ahora);
-  if (ultimo[dato.ci] && ms - ultimo[dato.ci] < 15000) return;          // misma persona frente a la cámara
-  ultimo[dato.ci] = ms;
+  var clave = dato.ci + "|" + quitarAcentos(dato.nombre);
+  if (ultimo[clave] && ms - ultimo[clave] < 15000) return;              // el mismo carnet sigue frente a la cámara
+  ultimo[clave] = ms;
   var p = porCI[dato.ci];
   if (dato.inst && CFG.personal.length && quitarAcentos(dato.inst) !== quitarAcentos(CFG.nombreQR || CFG.nombre)) {
     avisar("mal", "Carnet de otra institución", dato.nombre || ("C.I. " + dato.ci), dato.inst); pitar(false); return;
+  }
+  if (p && dato.nombre && quitarAcentos(dato.nombre) !== quitarAcentos(p.nombre)) {
+    avisar("mal", "Carnet no válido", "El nombre del QR no coincide con la cédula", "QR: " + dato.nombre + " · Nómina: " + p.nombre); pitar(false); return;
   }
   var nombre = (p && p.nombre) || dato.nombre || ("C.I. " + dato.ci);
   var delDia = eventos.filter(function(e){ return e.fecha === fecha && e.ci === dato.ci; });
@@ -298,9 +303,13 @@ function pintar(){
   ep.hidden = !ajustes.url || !pend; ep.textContent = pend + " por enviar";
   var re = document.getElementById("r-envio");
   var num = numeroWA(ajustes.wa);
-  re.textContent = num ? "El botón abre WhatsApp con el reporte listo para enviar al " + ajustes.wa + ". Si no hay internet, WhatsApp lo envía cuando vuelva la señal."
-                       : "El botón abre WhatsApp con el reporte listo; usted elige a quién enviarlo. Puede fijar el número en Ajustes de la escuela.";
+  re.textContent = (ajustes.correo ? "«Enviar por correo» abre el correo del teléfono con el reporte para " + ajustes.correo + ". " : "Escriba el correo de la institución en Ajustes de la escuela para enviar el reporte por correo. ") + (num ? "El botón abre WhatsApp con el reporte listo para enviar al " + ajustes.wa + ". Si no hay internet, WhatsApp lo envía cuando vuelva la señal."
+                       : "El botón de WhatsApp abre el reporte listo; usted elige a quién enviarlo.");
   document.getElementById("b-wa").href = "https://wa.me/" + num + "?text=" + encodeURIComponent(reporte(diaVisto));
+  var pcv = porcentaje(estadoDia(diaVisto));
+  document.getElementById("b-correo").href = "mailto:" + encodeURIComponent(ajustes.correo).replace(/%40/g, "@") +
+    "?subject=" + encodeURIComponent("Asistencia del personal " + fechaLarga(diaVisto) + " - " + CFG.nombre + (pcv ? ": " + pcv.pct + " %" : "")) +
+    "&body=" + encodeURIComponent(reporte(diaVisto).replace(/\*/g, ""));
   document.getElementById("b-enviar").hidden = !ajustes.url;
 }
 function numeroWA(t){ var d = soloNum(t); if (!d) return ""; if (d.charAt(0) === "0") d = "58" + d.slice(1); else if (d.length === 10) d = "58" + d; return d; }
@@ -395,7 +404,7 @@ if ("BarcodeDetector" in window) { try { window.BarcodeDetector.getSupportedForm
 document.getElementById("f-manual").addEventListener("submit", function(e){
   e.preventDefault(); var i = document.getElementById("i-ci"), ci = soloNum(i.value);
   if (ci.length < 5) { avisar("mal", "Cédula incompleta", "Escriba solo los números", ""); return; }
-  ultimo[ci] = 0; registrar({ ci: ci, letra: /^\s*e/i.test(i.value) ? "E" : "V", nombre: "", inst: "" }, "manual"); i.value = "";
+  ultimo[ci + "|"] = 0; registrar({ ci: ci, letra: /^\s*e/i.test(i.value) ? "E" : "V", nombre: "", inst: "" }, "manual"); i.value = "";
 });
 document.getElementById("s-dia").addEventListener("change", function(e){ diaVisto = e.target.value; pintar(); });
 var fa = document.getElementById("f-ajustes");
