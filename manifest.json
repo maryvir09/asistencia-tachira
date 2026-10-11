@@ -1,0 +1,17 @@
+{
+ "name": "Asistencia del personal",
+ "short_name": "Asistencia",
+ "start_url": "./",
+ "display": "standalone",
+ "background_color": "#f3f5f9",
+ "theme_color": "#1f4fae",
+ "lang": "es",
+ "icons": [
+  {
+   "src": "icono.svg",
+   "sizes": "any",
+   "type": "image/svg+xml",
+   "purpose": "any"
+  }
+ ]
+}
