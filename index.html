@@ -131,6 +131,16 @@ a.btn{text-decoration:none;display:inline-block}
     </div>
   </details>
 
+  <details id="d-mes">
+    <summary>Resumen del mes (asistencias e inasistencias)</summary>
+    <div class="campos">
+      <label>Mes<select id="s-mes" class="btn chico" aria-label="Mes"></select></label>
+      <p class="nota" id="m-nota"></p>
+      <div class="fila"><a class="btn chico wa" id="m-wa" href="https://wa.me/" target="_blank" rel="noopener">Enviar por WhatsApp</a><a class="btn chico correo" id="m-correo" href="mailto:">Enviar por correo</a><button class="btn chico" id="m-copiar" type="button">Copiar texto</button><button class="btn chico" id="m-excel" type="button">Descargar para Excel</button></div>
+      <textarea id="t-mes" readonly aria-label="Resumen del mes"></textarea>
+    </div>
+  </details>
+
   <details>
     <summary>Ajustes de la escuela</summary>
     <form class="campos" id="f-ajustes">
@@ -311,6 +321,7 @@ function pintar(){
     "?subject=" + encodeURIComponent("Asistencia del personal " + fechaLarga(diaVisto) + " - " + CFG.nombre + (pcv ? ": " + pcv.pct + " %" : "")) +
     "&body=" + encodeURIComponent(reporte(diaVisto).replace(/\*/g, ""));
   document.getElementById("b-enviar").hidden = !ajustes.url;
+  pintarMes();
 }
 function numeroWA(t){ var d = soloNum(t); if (!d) return ""; if (d.charAt(0) === "0") d = "58" + d.slice(1); else if (d.length === 10) d = "58" + d; return d; }
 function porcentaje(filas){
@@ -327,6 +338,61 @@ function reporte(fecha){
   si.forEach(function(f){ t += "• " + f.nombre + "  " + hora12(f.ent) + (f.ent > ajustes.hora ? " (tarde)" : "") + (f.sal ? " – salida " + hora12(f.sal) : "") + "\n"; });
   if (CFG.personal.length) { t += "\nNo registraron asistencia: " + no.length + "\n"; no.forEach(function(f){ t += "• " + f.nombre + "\n"; }); }
   return t;
+}
+
+/* ---------- resumen del mes ---------- */
+var MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+var mesVisto = hoyISO().slice(0, 7);
+function nombreMes(ym){ var p = ym.split("-"); return MESES[+p[1] - 1] + " " + p[0]; }
+function resumenMes(ym){
+  // Días de clase = días de ese mes en que el teléfono registró al menos un carnet (si no hubo clases, no cuenta).
+  var dias = {}; eventos.forEach(function(e){ if (e.fecha.slice(0, 7) === ym) dias[e.fecha] = 1; });
+  dias = Object.keys(dias).sort();
+  var filas = {};
+  CFG.personal.forEach(function(p){ var ci = soloNum(p.ci); filas[ci] = { ci: ci, nombre: p.nombre, cargo: p.cargo || "", asis: 0, tarde: 0, faltas: [] }; });
+  dias.forEach(function(d){
+    estadoDia(d).forEach(function(f){
+      var x = filas[f.ci]; if (!x) return;            // solo personal de la nómina
+      if (f.ent) { x.asis++; if (f.ent > ajustes.hora) x.tarde++; } else x.faltas.push(d);
+    });
+  });
+  var arr = Object.keys(filas).map(function(k){ var x = filas[k]; x.inas = x.faltas.length; x.pct = dias.length ? Math.round(x.asis * 100 / dias.length) : 0; return x; });
+  arr.sort(function(a, b){ return b.inas - a.inas || a.nombre.localeCompare(b.nombre); });
+  var tot = arr.reduce(function(s, x){ return s + x.asis; }, 0), pos = dias.length * arr.length;
+  return { dias: dias, filas: arr, pct: pos ? Math.round(tot * 100 / pos) : 0 };
+}
+function textoMes(ym){
+  var r = resumenMes(ym), t = "*RESUMEN DE ASISTENCIA DEL MES*\n" + CFG.nombre + "\n" + nombreMes(ym).toUpperCase() + "\n\n";
+  if (!r.dias.length) return t + "No hay registros en este mes.";
+  t += "Días de clase registrados: " + r.dias.length + "\n*Asistencia general: " + r.pct + " %*\n\n";
+  var con = r.filas.filter(function(x){ return x.inas; }), sin = r.filas.filter(function(x){ return !x.inas; });
+  t += "*CON INASISTENCIAS (" + con.length + ")*\n";
+  con.forEach(function(x){ t += "• " + x.nombre + ": " + x.inas + " falta(s), " + x.asis + " asistencia(s)" + (x.tarde ? ", " + x.tarde + " tarde(s)" : "") +
+    "\n   Faltó: " + x.faltas.map(function(d){ return d.slice(8) + "/" + d.slice(5, 7); }).join(", ") + "\n"; });
+  if (!con.length) t += "Ninguna.\n";
+  t += "\n*ASISTENCIA COMPLETA (" + sin.length + ")*\n";
+  sin.forEach(function(x){ t += "• " + x.nombre + (x.tarde ? " (" + x.tarde + " tarde(s))" : "") + "\n"; });
+  return t;
+}
+function csvMes(ym){
+  var r = resumenMes(ym), q = function(v){ return '"' + String(v).replace(/"/g, '""') + '"'; };
+  var L = [["Institución", CFG.nombre], ["Mes", nombreMes(ym)], ["Días de clase registrados", r.dias.length], [],
+           ["Cédula", "Nombre", "Cargo", "Asistencias", "Inasistencias", "Llegadas tarde", "% asistencia", "Días que faltó"]];
+  r.filas.forEach(function(x){ L.push([x.ci, x.nombre, x.cargo, x.asis, x.inas, x.tarde, x.pct + " %", x.faltas.join(" ")]); });
+  return "\ufeff" + L.map(function(f){ return f.map(q).join(";"); }).join("\r\n");
+}
+function pintarMes(){
+  var meses = {}; meses[hoyISO().slice(0, 7)] = 1; eventos.forEach(function(e){ meses[e.fecha.slice(0, 7)] = 1; });
+  var sel = document.getElementById("s-mes"); sel.innerHTML = "";
+  Object.keys(meses).sort().reverse().forEach(function(m){ var o = document.createElement("option"); o.value = m; o.textContent = nombreMes(m); sel.appendChild(o); });
+  sel.value = mesVisto;
+  var r = resumenMes(mesVisto), txt = textoMes(mesVisto);
+  document.getElementById("t-mes").value = txt;
+  document.getElementById("m-nota").textContent = "Cuenta como día de clase cada día en que se escaneó al menos un carnet. " +
+    (r.dias.length ? r.dias.length + " día(s) en " + nombreMes(mesVisto) + "." : "");
+  document.getElementById("m-wa").href = "https://wa.me/" + numeroWA(ajustes.wa) + "?text=" + encodeURIComponent(txt);
+  document.getElementById("m-correo").href = "mailto:" + encodeURIComponent(ajustes.correo).replace(/%40/g, "@") +
+    "?subject=" + encodeURIComponent("Resumen de asistencia " + nombreMes(mesVisto) + " - " + CFG.nombre) + "&body=" + encodeURIComponent(txt.replace(/\*/g, ""));
 }
 
 /* ---------- envío a la hoja de Google (cuando hay internet) ---------- */
@@ -423,6 +489,19 @@ document.getElementById("b-copiar").addEventListener("click", function(){
   var t = document.getElementById("t-reporte"), b = this;
   var ok = function(){ b.textContent = "Copiado"; setTimeout(function(){ b.textContent = "Copiar texto"; }, 1500); };
   try { navigator.clipboard.writeText(t.value).then(ok, function(){ t.select(); }); } catch(e){ t.select(); }
+});
+
+document.getElementById("s-mes").addEventListener("change", function(e){ mesVisto = e.target.value; pintarMes(); });
+document.getElementById("m-copiar").addEventListener("click", function(){
+  var t = document.getElementById("t-mes"), b = this;
+  var ok = function(){ b.textContent = "Copiado"; setTimeout(function(){ b.textContent = "Copiar texto"; }, 1500); };
+  try { navigator.clipboard.writeText(t.value).then(ok, function(){ t.select(); }); } catch(e){ t.select(); }
+});
+document.getElementById("m-excel").addEventListener("click", function(){
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csvMes(mesVisto)], { type: "text/csv;charset=utf-8" }));
+  a.download = "Asistencia_" + mesVisto + "_" + (CFG.codigo || "escuela") + ".csv";
+  document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 });
 
 /* ---------- arranque ---------- */
