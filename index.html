@@ -141,10 +141,29 @@ a.btn{text-decoration:none;display:inline-block}
     </div>
   </details>
 
+  <details id="d-personal">
+    <summary>Personal: turno, permisos y CDCE</summary>
+    <div class="campos">
+      <p class="nota">Todos empiezan en el turno de la <b>mañana</b>. Cambie el turno de quien trabaja en la tarde o en los dos turnos. Marque «Adscrito al CDCE» al personal del CDCE que figura en esta nómina: no cuenta como inasistente ni baja el porcentaje.</p>
+      <ul class="lista" id="l-personal"></ul>
+      <h2 style="margin:8px 0 0;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Permisos y reposos</h2>
+      <p class="nota">Los días de permiso o reposo no cuentan como inasistencia ni bajan el porcentaje. Si la persona viene ese día igual, cuenta como asistencia.</p>
+      <form class="campos" id="f-permiso">
+        <label>Trabajador<select id="p-ci" class="btn chico"></select></label>
+        <label>Motivo<select id="p-motivo" class="btn chico"><option>Permiso</option><option>Reposo médico</option><option>Pre y post natal</option><option>Vacaciones</option><option>Comisión de servicio</option><option>Otro</option></select></label>
+        <div class="fila"><label style="flex:1 1 140px">Desde<input id="p-desde" type="date" required></label><label style="flex:1 1 140px">Hasta<input id="p-hasta" type="date" required></label></div>
+        <div class="fila"><button class="btn chico" type="submit">Guardar permiso</button><span class="nota" id="p-ok"></span></div>
+      </form>
+      <ul class="lista" id="l-permisos"></ul>
+    </div>
+  </details>
+
   <details>
     <summary>Ajustes de la escuela</summary>
     <form class="campos" id="f-ajustes">
-      <label>Hora de entrada (después de esta hora cuenta como tarde)<input id="a-hora" type="time"></label>
+      <label>Hora de entrada del turno de la mañana (después de esta hora cuenta como llegada tarde)<input id="a-hora" type="time"></label>
+      <label>Hora de entrada del turno de la tarde<input id="a-horat" type="time"></label>
+      <label>Hora que separa la mañana de la tarde (solo para quien trabaja los dos turnos)<input id="a-corte" type="time"></label>
       <label>Correo de la institución (recibe el reporte)<input id="a-correo" type="email" autocomplete="off" placeholder="escuela@gmail.com"></label>
       <label>WhatsApp que recibe el reporte (director o supervisor)<input id="a-wa" type="tel" inputmode="tel" autocomplete="off" placeholder="0414-1234567"></label>
       <label>Hoja de Google (opcional, solo si la escuela tiene una)<input id="a-url" type="url" autocomplete="off" placeholder="https://script.google.com/macros/s/…/exec"></label>
@@ -196,8 +215,11 @@ var CLAVE = "asis:" + (CFG.codigo || CFG.nombre);
 /* ---------- almacenamiento local ---------- */
 function leer(k, def){ try { var v = localStorage.getItem(CLAVE + ":" + k); return v ? JSON.parse(v) : def; } catch(e){ return def; } }
 function guardar(k, v){ try { localStorage.setItem(CLAVE + ":" + k, JSON.stringify(v)); } catch(e){} }
-var ajustes = Object.assign({hora: CFG.horaEntrada || "07:15", correo: CFG.correo || "", url: CFG.urlHoja || "", wa: CFG.whatsapp || ""}, leer("ajustes", {}));
-var eventos = leer("eventos", []);          // {id, fecha, hora, tipo, ci, nombre, inst, enviado}
+var ajustes = Object.assign({hora: CFG.horaEntrada || "07:15", horaT: "13:00", corte: "12:30", correo: CFG.correo || "", url: CFG.urlHoja || "", wa: CFG.whatsapp || ""}, leer("ajustes", {}));
+if (!ajustes.horaT) ajustes.horaT = "13:00"; if (!ajustes.corte) ajustes.corte = "12:30";
+var eventos = leer("eventos", []);          // {id, fecha, hora, tipo, turno, ci, nombre, inst, enviado}
+var perfil = leer("perfil", {});            // ci -> {t: "M" | "T" | "A", cdce: true/false}
+var permisos = leer("permisos", []);        // {id, ci, nombre, motivo, desde, hasta}
 var disp = leer("disp", null); if (!disp){ disp = Math.random().toString(36).slice(2, 8); guardar("disp", disp); }
 
 /* ---------- utilidades ---------- */
@@ -210,6 +232,17 @@ function fechaLarga(iso){ var p = iso.split("-"), d = new Date(+p[0], +p[1]-1, +
 function soloNum(ci){ return String(ci || "").replace(/\D/g, ""); }
 function quitarAcentos(s){ return String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/\s+/g, " ").trim(); }
 var porCI = {}; CFG.personal.forEach(function(p){ porCI[soloNum(p.ci)] = p; });
+
+/* ---------- turnos, permisos y CDCE ---------- */
+var NT = { M: "mañana", T: "tarde" };
+function turnoDe(ci){ var p = perfil[ci]; return (p && p.t) || "M"; }
+function turnosDe(ci){ var t = turnoDe(ci); return t === "A" ? ["M", "T"] : [t]; }
+function esCDCE(ci){ return !!(perfil[ci] && perfil[ci].cdce); }
+function permisoDe(ci, fecha){ for (var i = 0; i < permisos.length; i++){ var x = permisos[i]; if (x.ci === ci && x.desde <= fecha && fecha <= x.hasta) return x; } return null; }
+function horaDe(t){ return t === "T" ? ajustes.horaT : ajustes.hora; }
+function turnoDelEscaneo(ci, hm){ var t = turnoDe(ci); if (t !== "A") return t; return hm < ajustes.corte ? "M" : "T"; }
+function hayTarde(){ return CFG.personal.some(function(p){ return turnoDe(soloNum(p.ci)) !== "M"; }) || eventos.some(function(e){ return e.turno === "T"; }); }
+function conTurno(f){ return hayTarde() ? " (" + NT[f.turno] + ")" : ""; }
 
 /* Lee el texto del QR del carnet: "INSTITUCIÓN\nNOMBRE\nC.I.: V-12345678" */
 function leerQR(txt){
@@ -237,7 +270,8 @@ function registrar(dato, origen){
     avisar("mal", "Carnet no válido", "El nombre del QR no coincide con la cédula", "QR: " + dato.nombre + " · Nómina: " + p.nombre); pitar(false); return;
   }
   var nombre = (p && p.nombre) || dato.nombre || ("C.I. " + dato.ci);
-  var delDia = eventos.filter(function(e){ return e.fecha === fecha && e.ci === dato.ci; });
+  var turno = turnoDelEscaneo(dato.ci, hm);
+  var delDia = eventos.filter(function(e){ return e.fecha === fecha && e.ci === dato.ci && (e.turno || "M") === turno; });
   var ent = delDia.find(function(e){ return e.tipo === "ENTRADA"; });
   var tipo = "ENTRADA";
   if (ent) {
@@ -245,13 +279,14 @@ function registrar(dato, origen){
     if (min < 2) { avisar("info", "Ya registrado", nombre, "Entrada " + hora12(ent.hora)); pitar(true); return; }
     tipo = "SALIDA";
   }
-  var ev = { id: disp + "-" + ms, ms: ms, fecha: fecha, hora: hm, tipo: tipo, ci: dato.ci, letra: dato.letra || "V",
+  var ev = { id: disp + "-" + ms, ms: ms, fecha: fecha, hora: hm, tipo: tipo, turno: turno, ci: dato.ci, letra: dato.letra || "V",
              nombre: nombre, cargo: p ? p.cargo : "", inst: CFG.nombre, origen: origen, enviado: false };
   eventos.push(ev); guardar("eventos", eventos);
-  var tarde = tipo === "ENTRADA" && hm > ajustes.hora;
+  var tarde = tipo === "ENTRADA" && hm > horaDe(turno);
+  var tt = hayTarde() ? " · turno de la " + NT[turno] : "";
   avisar(tipo === "SALIDA" ? "info" : (tarde ? "tarde" : "ok"),
-         tipo === "SALIDA" ? "Salida" : (tarde ? "Entrada tarde" : "Entrada"),
-         nombre, hora12(hm) + (p ? "" : " · no está en la nómina cargada"));
+         tipo === "SALIDA" ? "Salida" : (tarde ? "Entrada: llegó tarde" : "Entrada"),
+         nombre, hora12(hm) + tt + (p ? "" : " · no está en la nómina cargada"));
   pitar(true); diaVisto = fecha; pintar(); sincronizar();
 }
 
@@ -271,16 +306,29 @@ function pitar(bien){
 
 /* ---------- vista ---------- */
 var diaVisto = hoyISO();
+/* Una fila por persona y turno. estado: "asistio" | "falta" | "permiso" | "cdce" | "fuera" (fuera de la nómina) */
 function estadoDia(fecha){
   var filas = {};
-  CFG.personal.forEach(function(p){ filas[soloNum(p.ci)] = { ci: soloNum(p.ci), nombre: p.nombre, cargo: p.cargo, ent: null, sal: null }; });
+  CFG.personal.forEach(function(p){ var ci = soloNum(p.ci);
+    turnosDe(ci).forEach(function(t){ filas[ci + "|" + t] = { ci: ci, nombre: p.nombre, cargo: p.cargo, turno: t, nomina: true, ent: null, sal: null }; }); });
   eventos.filter(function(e){ return e.fecha === fecha; }).forEach(function(e){
-    var f = filas[e.ci] || (filas[e.ci] = { ci: e.ci, nombre: e.nombre, cargo: e.cargo || "Fuera de la nómina", ent: null, sal: null });
+    var t = e.turno || "M", k = e.ci + "|" + t;
+    var f = filas[k] || (filas[k] = { ci: e.ci, nombre: e.nombre, cargo: e.cargo || "Fuera de la nómina", turno: t, nomina: !!porCI[e.ci], ent: null, sal: null });
     if (e.tipo === "ENTRADA" && !f.ent) f.ent = e.hora; else if (e.tipo === "SALIDA") f.sal = e.hora;
   });
-  var arr = Object.keys(filas).map(function(k){ return filas[k]; });
-  arr.sort(function(a, b){ if (!!a.ent !== !!b.ent) return a.ent ? -1 : 1; return a.ent && b.ent ? a.ent.localeCompare(b.ent) : a.nombre.localeCompare(b.nombre); });
+  var arr = Object.keys(filas).map(function(k){ var f = filas[k];
+    f.cdce = esCDCE(f.ci); f.permiso = permisoDe(f.ci, fecha);
+    f.estado = f.ent ? "asistio" : (!f.nomina ? "fuera" : (f.cdce ? "cdce" : (f.permiso ? "permiso" : "falta")));
+    f.tarde = !!f.ent && f.ent > horaDe(f.turno);
+    return f; });
+  var orden = { asistio: 0, falta: 1, permiso: 2, cdce: 3, fuera: 4 };
+  arr.sort(function(a, b){ return orden[a.estado] - orden[b.estado] || (a.ent && b.ent ? a.ent.localeCompare(b.ent) : 0) || a.nombre.localeCompare(b.nombre) || a.turno.localeCompare(b.turno); });
   return arr;
+}
+function abrirPermiso(ci, fecha){
+  var d = document.getElementById("d-personal"); d.open = true;
+  document.getElementById("p-ci").value = ci; document.getElementById("p-desde").value = fecha; document.getElementById("p-hasta").value = fecha;
+  document.getElementById("f-permiso").scrollIntoView({ behavior: "smooth", block: "center" });
 }
 function pintar(){
   var hoy = hoyISO();
@@ -291,16 +339,22 @@ function pintar(){
   sel.value = diaVisto;
   var filas = estadoDia(diaVisto), pres = 0, tarde = 0, aus = 0, ul = document.getElementById("lista");
   ul.innerHTML = "";
+  var dosT = hayTarde();
   filas.forEach(function(f){
     var li = document.createElement("li"), n = document.createElement("span"), c = document.createElement("span"), h = document.createElement("span");
     n.className = "n"; c.className = "c"; h.className = "h";
-    n.textContent = f.nombre; c.textContent = (f.cargo || "") + " · C.I. " + f.ci;
+    n.textContent = f.nombre; c.textContent = (f.cargo || "") + " · C.I. " + f.ci + (dosT ? " · Turno de la " + NT[f.turno] : "");
     var chip = document.createElement("span");
-    if (f.ent) { pres++; var t = f.ent > ajustes.hora; if (t) tarde++;
-      chip.className = "chip " + (t ? "tarde" : "ok"); chip.textContent = t ? "Tarde" : "Asistió";
+    if (f.estado === "asistio") { if (f.nomina && !f.cdce) { pres++; if (f.tarde) tarde++; }
+      chip.className = "chip " + (f.tarde ? "tarde" : "ok"); chip.textContent = f.tarde ? "Llegó tarde" : "Asistió";
       h.appendChild(chip); h.appendChild(document.createElement("br"));
       h.appendChild(document.createTextNode(hora12(f.ent) + (f.sal ? " – " + hora12(f.sal) : "")));
-    } else { aus++; chip.className = "chip " + (diaVisto === hoy ? "gris" : "mal"); chip.textContent = diaVisto === hoy ? "Sin registrar" : "No asistió"; h.appendChild(chip); }
+    } else if (f.estado === "permiso") { chip.className = "chip gris"; chip.textContent = f.permiso.motivo; h.appendChild(chip);
+    } else if (f.estado === "cdce") { chip.className = "chip gris"; chip.textContent = "En el CDCE"; h.appendChild(chip);
+    } else { aus++; chip.className = "chip " + (diaVisto === hoy ? "gris" : "mal"); chip.textContent = diaVisto === hoy ? "Sin registrar" : "No asistió"; h.appendChild(chip);
+      var bj = document.createElement("button"); bj.type = "button"; bj.className = "btn chico"; bj.style.marginTop = "4px"; bj.textContent = "Justificar";
+      bj.addEventListener("click", (function(ci){ return function(){ abrirPermiso(ci, diaVisto); }; })(f.ci));
+      h.appendChild(document.createElement("br")); h.appendChild(bj); }
     li.appendChild(n); li.appendChild(h); li.appendChild(c); ul.appendChild(li);
   });
   var pc = porcentaje(filas);
@@ -321,22 +375,31 @@ function pintar(){
     "?subject=" + encodeURIComponent("Asistencia del personal " + fechaLarga(diaVisto) + " - " + CFG.nombre + (pcv ? ": " + pcv.pct + " %" : "")) +
     "&body=" + encodeURIComponent(reporte(diaVisto).replace(/\*/g, ""));
   document.getElementById("b-enviar").hidden = !ajustes.url;
-  pintarMes();
+  pintarMes(); pintarPersonal();
 }
 function numeroWA(t){ var d = soloNum(t); if (!d) return ""; if (d.charAt(0) === "0") d = "58" + d.slice(1); else if (d.length === 10) d = "58" + d; return d; }
+/* Cuentan para el porcentaje: personal de la nómina, que no sea del CDCE y que no tenga permiso ese día (si vino con permiso, cuenta). */
 function porcentaje(filas){
-  var total = CFG.personal.length; if (!total) return null;
-  var en = filas.filter(function(f){ return f.ent && porCI[f.ci]; }).length;
-  return { pct: Math.round(en * 100 / total), en: en, total: total };
+  var esp = filas.filter(function(f){ return f.nomina && !f.cdce && (f.ent || !f.permiso); });
+  if (!esp.length) return null;
+  var en = esp.filter(function(f){ return f.ent; }).length;
+  return { pct: Math.round(en * 100 / esp.length), en: en, total: esp.length };
 }
 function reporte(fecha){
-  var filas = estadoDia(fecha), si = filas.filter(function(f){ return f.ent; }), no = filas.filter(function(f){ return !f.ent; });
+  var filas = estadoDia(fecha), dosT = hayTarde();
+  var de = function(e){ return filas.filter(function(f){ return f.estado === e; }); };
+  var si = filas.filter(function(f){ return f.estado === "asistio" && f.nomina && !f.cdce; }), no = de("falta"), pe = de("permiso"), cd = de("cdce"), fu = de("fuera");
+  var cdVino = filas.filter(function(f){ return f.estado === "asistio" && f.cdce; });
   var t = "*ASISTENCIA DEL PERSONAL*\n" + CFG.nombre + "\n" + fechaLarga(fecha) + "\n\n";
   var pc = porcentaje(filas);
-  if (pc) t += "*Asistencia: " + pc.pct + " %* (" + pc.en + " de " + pc.total + ")\n";
-  t += "Asistieron: " + si.length + (CFG.personal.length ? " de " + CFG.personal.length : "") + "\n";
-  si.forEach(function(f){ t += "• " + f.nombre + "  " + hora12(f.ent) + (f.ent > ajustes.hora ? " (tarde)" : "") + (f.sal ? " – salida " + hora12(f.sal) : "") + "\n"; });
-  if (CFG.personal.length) { t += "\nNo registraron asistencia: " + no.length + "\n"; no.forEach(function(f){ t += "• " + f.nombre + "\n"; }); }
+  if (pc) t += "*Asistencia: " + pc.pct + " %* (" + pc.en + " de " + pc.total + (dosT ? " jornadas" : "") + ")\n";
+  var lista = function(titulo, arr, fn){ if (!arr.length) return; t += "\n" + titulo + ": " + arr.length + "\n"; arr.forEach(function(f){ t += "• " + f.nombre + (dosT ? " (" + NT[f.turno] + ")" : "") + (fn ? fn(f) : "") + "\n"; }); };
+  t += "Asistieron: " + si.length + "\n";
+  si.forEach(function(f){ t += "• " + f.nombre + (dosT ? " (" + NT[f.turno] + ")" : "") + "  " + hora12(f.ent) + (f.tarde ? " (llegó tarde)" : "") + (f.sal ? " – salida " + hora12(f.sal) : "") + "\n"; });
+  if (CFG.personal.length) { t += "\nNo registraron asistencia: " + no.length + "\n"; no.forEach(function(f){ t += "• " + f.nombre + (dosT ? " (" + NT[f.turno] + ")" : "") + "\n"; }); }
+  lista("Con permiso o reposo (no cuentan como falta)", pe, function(f){ return " – " + f.permiso.motivo; });
+  lista("Adscritos al CDCE (no cuentan)", cd.concat(cdVino));
+  lista("Fuera de la nómina", fu, function(f){ return "  " + hora12(f.ent); });
   return t;
 }
 
@@ -348,38 +411,89 @@ function resumenMes(ym){
   // Días de clase = días de ese mes en que el teléfono registró al menos un carnet (si no hubo clases, no cuenta).
   var dias = {}; eventos.forEach(function(e){ if (e.fecha.slice(0, 7) === ym) dias[e.fecha] = 1; });
   dias = Object.keys(dias).sort();
-  var filas = {};
-  CFG.personal.forEach(function(p){ var ci = soloNum(p.ci); filas[ci] = { ci: ci, nombre: p.nombre, cargo: p.cargo || "", asis: 0, tarde: 0, faltas: [] }; });
+  // Se cuenta por jornada: quien trabaja los dos turnos tiene 2 jornadas por día.
+  var filas = {}, dosT = hayTarde();
+  CFG.personal.forEach(function(p){ var ci = soloNum(p.ci);
+    filas[ci] = { ci: ci, nombre: p.nombre, cargo: p.cargo || "", turno: turnoDe(ci), cdce: esCDCE(ci), asis: 0, tarde: 0, faltas: [], perm: [] }; });
   dias.forEach(function(d){
     estadoDia(d).forEach(function(f){
-      var x = filas[f.ci]; if (!x) return;            // solo personal de la nómina
-      if (f.ent) { x.asis++; if (f.ent > ajustes.hora) x.tarde++; } else x.faltas.push(d);
+      var x = filas[f.ci]; if (!x || !f.nomina) return;            // solo personal de la nómina
+      var et = d.slice(8) + "/" + d.slice(5, 7) + (x.turno === "A" ? " (" + NT[f.turno] + ")" : "");
+      if (f.estado === "asistio") { x.asis++; if (f.tarde) x.tarde++; }
+      else if (f.estado === "permiso") x.perm.push(et + " " + f.permiso.motivo.toLowerCase());
+      else if (f.estado === "falta") x.faltas.push(et);
     });
   });
-  var arr = Object.keys(filas).map(function(k){ var x = filas[k]; x.inas = x.faltas.length; x.pct = dias.length ? Math.round(x.asis * 100 / dias.length) : 0; return x; });
+  var arr = Object.keys(filas).map(function(k){ var x = filas[k]; x.inas = x.faltas.length; x.esp = x.asis + x.inas;
+    x.pct = x.esp ? Math.round(x.asis * 100 / x.esp) : 0; return x; });
   arr.sort(function(a, b){ return b.inas - a.inas || a.nombre.localeCompare(b.nombre); });
-  var tot = arr.reduce(function(s, x){ return s + x.asis; }, 0), pos = dias.length * arr.length;
-  return { dias: dias, filas: arr, pct: pos ? Math.round(tot * 100 / pos) : 0 };
+  var cuentan = arr.filter(function(x){ return !x.cdce; });
+  var tot = cuentan.reduce(function(s, x){ return s + x.asis; }, 0), pos = cuentan.reduce(function(s, x){ return s + x.esp; }, 0);
+  return { dias: dias, filas: arr, pct: pos ? Math.round(tot * 100 / pos) : 0, dosT: dosT };
 }
 function textoMes(ym){
   var r = resumenMes(ym), t = "*RESUMEN DE ASISTENCIA DEL MES*\n" + CFG.nombre + "\n" + nombreMes(ym).toUpperCase() + "\n\n";
   if (!r.dias.length) return t + "No hay registros en este mes.";
   t += "Días de clase registrados: " + r.dias.length + "\n*Asistencia general: " + r.pct + " %*\n\n";
-  var con = r.filas.filter(function(x){ return x.inas; }), sin = r.filas.filter(function(x){ return !x.inas; });
+  var cuentan = r.filas.filter(function(x){ return !x.cdce; }), cd = r.filas.filter(function(x){ return x.cdce; });
+  var con = cuentan.filter(function(x){ return x.inas; }), sin = cuentan.filter(function(x){ return !x.inas; }), pe = cuentan.filter(function(x){ return x.perm.length; });
+  var TT = { M: "", T: " [tarde]", A: " [ambos turnos]" };
+  var tt = function(x){ return r.dosT ? TT[x.turno] : ""; };
   t += "*CON INASISTENCIAS (" + con.length + ")*\n";
-  con.forEach(function(x){ t += "• " + x.nombre + ": " + x.inas + " falta(s), " + x.asis + " asistencia(s)" + (x.tarde ? ", " + x.tarde + " tarde(s)" : "") +
-    "\n   Faltó: " + x.faltas.map(function(d){ return d.slice(8) + "/" + d.slice(5, 7); }).join(", ") + "\n"; });
+  con.forEach(function(x){ t += "• " + x.nombre + tt(x) + ": " + x.inas + " falta(s), " + x.asis + " asistencia(s)" + (x.tarde ? ", " + x.tarde + " llegada(s) tarde" : "") +
+    "\n   Faltó: " + x.faltas.join(", ") + "\n"; });
   if (!con.length) t += "Ninguna.\n";
   t += "\n*ASISTENCIA COMPLETA (" + sin.length + ")*\n";
-  sin.forEach(function(x){ t += "• " + x.nombre + (x.tarde ? " (" + x.tarde + " tarde(s))" : "") + "\n"; });
+  sin.forEach(function(x){ t += "• " + x.nombre + tt(x) + (x.tarde ? " (" + x.tarde + " llegada(s) tarde)" : "") + "\n"; });
+  if (pe.length) { t += "\n*CON PERMISO O REPOSO (no cuenta como falta)*\n"; pe.forEach(function(x){ t += "• " + x.nombre + ": " + x.perm.join(", ") + "\n"; }); }
+  if (cd.length) { t += "\n*ADSCRITOS AL CDCE (no cuentan) (" + cd.length + ")*\n"; cd.forEach(function(x){ t += "• " + x.nombre + "\n"; }); }
   return t;
 }
 function csvMes(ym){
   var r = resumenMes(ym), q = function(v){ return '"' + String(v).replace(/"/g, '""') + '"'; };
-  var L = [["Institución", CFG.nombre], ["Mes", nombreMes(ym)], ["Días de clase registrados", r.dias.length], [],
-           ["Cédula", "Nombre", "Cargo", "Asistencias", "Inasistencias", "Llegadas tarde", "% asistencia", "Días que faltó"]];
-  r.filas.forEach(function(x){ L.push([x.ci, x.nombre, x.cargo, x.asis, x.inas, x.tarde, x.pct + " %", x.faltas.join(" ")]); });
-  return "\ufeff" + L.map(function(f){ return f.map(q).join(";"); }).join("\r\n");
+  var TN = { M: "Mañana", T: "Tarde", A: "Ambos" };
+  var L = [["Institución", CFG.nombre], ["Mes", nombreMes(ym)], ["Días de clase registrados", r.dias.length], ["Asistencia general", r.pct + " %"], [],
+           ["Cédula", "Nombre", "Cargo", "Turno", "Situación", "Asistencias", "Inasistencias", "Llegadas tarde", "% asistencia", "Días que faltó", "Permisos y reposos"]];
+  r.filas.forEach(function(x){ L.push([x.ci, x.nombre, x.cargo, TN[x.turno], x.cdce ? "Adscrito al CDCE" : "En la escuela", x.asis, x.cdce ? "" : x.inas, x.tarde,
+    x.cdce ? "" : x.pct + " %", x.faltas.join(" "), x.perm.join("; ")]); });
+  return "﻿" + L.map(function(f){ return f.map(q).join(";"); }).join("\r\n");
+}
+
+/* ---------- pantalla de personal: turno, CDCE y permisos ---------- */
+function pintarPersonal(){
+  var ul = document.getElementById("l-personal"), sel = document.getElementById("p-ci"), prev = sel.value;
+  if (ul.contains(document.activeElement) && ul.children.length) { pintarPermisos(); return; }   // no cerrar el menú que el director está usando
+  ul.innerHTML = ""; sel.innerHTML = "";
+  CFG.personal.forEach(function(p){
+    var ci = soloNum(p.ci), li = document.createElement("li"), n = document.createElement("span"), c = document.createElement("span"), h = document.createElement("span");
+    n.className = "n"; c.className = "c"; h.className = "h"; n.textContent = p.nombre; c.textContent = (p.cargo || "") + " · C.I. " + ci;
+    var st = document.createElement("select"); st.className = "btn chico"; st.setAttribute("aria-label", "Turno de " + p.nombre);
+    [["M", "Mañana"], ["T", "Tarde"], ["A", "Ambos turnos"]].forEach(function(o){ var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; st.appendChild(op); });
+    st.value = turnoDe(ci);
+    var sc = document.createElement("select"); sc.className = "btn chico"; sc.setAttribute("aria-label", "Situación de " + p.nombre);
+    [["", "En la escuela"], ["1", "Adscrito al CDCE"]].forEach(function(o){ var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; sc.appendChild(op); });
+    sc.value = esCDCE(ci) ? "1" : "";
+    var cambia = function(){ perfil[ci] = { t: st.value, cdce: sc.value === "1" }; guardar("perfil", perfil); pintar(); };
+    st.addEventListener("change", cambia); sc.addEventListener("change", cambia);
+    h.appendChild(st); h.appendChild(document.createElement("br")); h.appendChild(sc); h.style.fontFamily = "inherit";
+    li.appendChild(n); li.appendChild(h); li.appendChild(c); ul.appendChild(li);
+    var op = document.createElement("option"); op.value = ci; op.textContent = p.nombre; sel.appendChild(op);
+  });
+  if (prev) sel.value = prev;
+  pintarPermisos();
+}
+function pintarPermisos(){
+  var lp = document.getElementById("l-permisos"); lp.innerHTML = "";
+  permisos.slice().sort(function(a, b){ return b.desde.localeCompare(a.desde); }).forEach(function(x){
+    var li = document.createElement("li"), n = document.createElement("span"), c = document.createElement("span"), h = document.createElement("span");
+    n.className = "n"; c.className = "c"; h.className = "h"; n.textContent = x.nombre;
+    var fd = function(d){ return d.slice(8) + "/" + d.slice(5, 7) + "/" + d.slice(0, 4); };
+    c.textContent = x.motivo + " · " + (x.desde === x.hasta ? fd(x.desde) : "del " + fd(x.desde) + " al " + fd(x.hasta));
+    var b = document.createElement("button"); b.type = "button"; b.className = "btn chico"; b.textContent = "Quitar";
+    b.addEventListener("click", function(){ permisos = permisos.filter(function(y){ return y.id !== x.id; }); guardar("permisos", permisos); pintar(); });
+    h.style.fontFamily = "inherit"; h.appendChild(b); li.appendChild(n); li.appendChild(h); li.appendChild(c); lp.appendChild(li);
+  });
+  lp.hidden = !permisos.length;
 }
 function pintarMes(){
   var meses = {}; meses[hoyISO().slice(0, 7)] = 1; eventos.forEach(function(e){ meses[e.fecha.slice(0, 7)] = 1; });
@@ -388,7 +502,7 @@ function pintarMes(){
   sel.value = mesVisto;
   var r = resumenMes(mesVisto), txt = textoMes(mesVisto);
   document.getElementById("t-mes").value = txt;
-  document.getElementById("m-nota").textContent = "Cuenta como día de clase cada día en que se escaneó al menos un carnet. " +
+  document.getElementById("m-nota").textContent = "Cuenta como día de clase cada día en que se escaneó al menos un carnet. Los permisos, reposos y el personal adscrito al CDCE no cuentan como falta. " +
     (r.dias.length ? r.dias.length + " día(s) en " + nombreMes(mesVisto) + "." : "");
   document.getElementById("m-wa").href = "https://wa.me/" + numeroWA(ajustes.wa) + "?text=" + encodeURIComponent(txt);
   document.getElementById("m-correo").href = "mailto:" + encodeURIComponent(ajustes.correo).replace(/%40/g, "@") +
@@ -401,7 +515,7 @@ function sincronizar(){
   var pend = eventos.filter(function(e){ return !e.enviado; });
   if (!ajustes.url || !pend.length || enviando || !navigator.onLine) return Promise.resolve(false);
   enviando = true;
-  var lote = pend.slice(0, 200).map(function(e){ return { id: e.id, fecha: e.fecha, hora: e.hora, tipo: e.tipo, ci: e.letra + "-" + e.ci, nombre: e.nombre, cargo: e.cargo, inst: e.inst }; });
+  var lote = pend.slice(0, 200).map(function(e){ return { id: e.id, fecha: e.fecha, hora: e.hora, tipo: e.tipo, turno: NT[e.turno || "M"], ci: e.letra + "-" + e.ci, nombre: e.nombre, cargo: e.cargo, inst: e.inst }; });
   return fetch(ajustes.url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
                               body: JSON.stringify({ escuela: CFG.nombre, correo: ajustes.correo, horaEntrada: ajustes.hora, eventos: lote }) })
     .then(function(r){ return r.json(); })
@@ -474,9 +588,9 @@ document.getElementById("f-manual").addEventListener("submit", function(e){
 });
 document.getElementById("s-dia").addEventListener("change", function(e){ diaVisto = e.target.value; pintar(); });
 var fa = document.getElementById("f-ajustes");
-document.getElementById("a-hora").value = ajustes.hora; document.getElementById("a-correo").value = ajustes.correo; document.getElementById("a-url").value = ajustes.url; document.getElementById("a-wa").value = ajustes.wa;
+document.getElementById("a-hora").value = ajustes.hora; document.getElementById("a-horat").value = ajustes.horaT; document.getElementById("a-corte").value = ajustes.corte; document.getElementById("a-correo").value = ajustes.correo; document.getElementById("a-url").value = ajustes.url; document.getElementById("a-wa").value = ajustes.wa;
 fa.addEventListener("submit", function(e){ e.preventDefault();
-  ajustes = { hora: document.getElementById("a-hora").value || "07:15", correo: document.getElementById("a-correo").value.trim(), url: document.getElementById("a-url").value.trim(), wa: document.getElementById("a-wa").value.trim() };
+  ajustes = { hora: document.getElementById("a-hora").value || "07:15", horaT: document.getElementById("a-horat").value || "13:00", corte: document.getElementById("a-corte").value || "12:30", correo: document.getElementById("a-correo").value.trim(), url: document.getElementById("a-url").value.trim(), wa: document.getElementById("a-wa").value.trim() };
   guardar("ajustes", ajustes); document.getElementById("a-ok").textContent = "Guardado"; pintar(); sincronizar(); });
 document.getElementById("b-enviar").addEventListener("click", function(){
   var b = this; if (!ajustes.url) { document.getElementById("r-envio").textContent = "Falta la dirección de la hoja de Google en Ajustes de la escuela."; return; }
@@ -491,6 +605,16 @@ document.getElementById("b-copiar").addEventListener("click", function(){
   try { navigator.clipboard.writeText(t.value).then(ok, function(){ t.select(); }); } catch(e){ t.select(); }
 });
 
+document.getElementById("f-permiso").addEventListener("submit", function(e){
+  e.preventDefault();
+  var ci = document.getElementById("p-ci").value, d1 = document.getElementById("p-desde").value, d2 = document.getElementById("p-hasta").value || d1, ok = document.getElementById("p-ok");
+  if (!ci || !d1) { ok.textContent = "Elija el trabajador y la fecha."; return; }
+  if (d2 < d1) { var tmp = d1; d1 = d2; d2 = tmp; }
+  var p = porCI[ci];
+  permisos.push({ id: disp + "-" + Date.now(), ci: ci, nombre: p ? p.nombre : ci, motivo: document.getElementById("p-motivo").value, desde: d1, hasta: d2 });
+  guardar("permisos", permisos); ok.textContent = "Guardado"; setTimeout(function(){ ok.textContent = ""; }, 2000); pintar();
+});
+document.getElementById("p-desde").value = hoyISO(); document.getElementById("p-hasta").value = hoyISO();
 document.getElementById("s-mes").addEventListener("change", function(e){ mesVisto = e.target.value; pintarMes(); });
 document.getElementById("m-copiar").addEventListener("click", function(){
   var t = document.getElementById("t-mes"), b = this;

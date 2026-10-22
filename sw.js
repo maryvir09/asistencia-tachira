@@ -1,5 +1,5 @@
 // Guarda la página en el teléfono para que abra sin internet.
-const C = 'asistencia-0a22c788';
+const C = 'asistencia-c88f0d71';
 self.addEventListener('install', e => { e.waitUntil(caches.open(C).then(c => c.addAll(['./', 'index.html', 'manifest.json', 'icono.svg']))); self.skipWaiting(); });
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== C).map(x => caches.delete(x)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', e => {
