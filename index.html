@@ -77,6 +77,8 @@ textarea{width:100%;min-height:180px;font-family:var(--f-mono);font-size:13px;ba
 a.btn{text-decoration:none;display:inline-block}
 .btn.wa{background:var(--ok);border-color:var(--ok);color:var(--panel)}
 .btn.correo{background:var(--azul);border-color:var(--azul);color:var(--panel)}
+.campos .dias{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;margin-top:6px}
+.campos .dias label{display:inline-flex;align-items:center;gap:2px;font-size:12px;color:var(--ink)}
 .vacio{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;gap:8px}
 @media (prefers-reduced-motion:no-preference){.aviso{animation:entra .25s ease-out}@keyframes entra{from{transform:scale(.97)}to{transform:none}}}
 </style>
@@ -142,15 +144,15 @@ a.btn{text-decoration:none;display:inline-block}
   </details>
 
   <details id="d-personal">
-    <summary>Personal: turno, permisos y CDCE</summary>
+    <summary>Personal: turno, días, permisos y CDCE</summary>
     <div class="campos">
-      <p class="nota">Todos empiezan en el turno de la <b>mañana</b>. Cambie el turno de quien trabaja en la tarde o en los dos turnos. Marque «Adscrito al CDCE» al personal del CDCE que figura en esta nómina: no cuenta como inasistente ni baja el porcentaje.</p>
+      <p class="nota">Todos empiezan en el turno de la <b>mañana</b>. Cambie el turno de quien trabaja en la tarde o en los dos turnos. Marque «Adscrito al CDCE» al personal del CDCE que figura en esta nómina: no cuenta como inasistente ni baja el porcentaje. En los liceos, desmarque los días en que un docente no tiene horario (por ejemplo, solo va lunes, miércoles y viernes): esos días no cuentan como falta.</p>
       <ul class="lista" id="l-personal"></ul>
       <h2 style="margin:8px 0 0;font-size:15px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Permisos y reposos</h2>
       <p class="nota">Los días de permiso o reposo no cuentan como inasistencia ni bajan el porcentaje. Si la persona viene ese día igual, cuenta como asistencia.</p>
       <form class="campos" id="f-permiso">
         <label>Trabajador<select id="p-ci" class="btn chico"></select></label>
-        <label>Motivo<select id="p-motivo" class="btn chico"><option>Permiso</option><option>Reposo médico</option><option>Pre y post natal</option><option>Vacaciones</option><option>Comisión de servicio</option><option>Otro</option></select></label>
+        <label>Motivo<select id="p-motivo" class="btn chico"><option>Permiso</option><option>Reposo médico</option><option>Pre y post natal</option><option>Vacaciones</option><option>Comisión de servicio</option><option>Licencia sindical</option><option>Incapacidad</option><option>Otro</option></select></label>
         <div class="fila"><label style="flex:1 1 140px">Desde<input id="p-desde" type="date" required></label><label style="flex:1 1 140px">Hasta<input id="p-hasta" type="date" required></label></div>
         <div class="fila"><button class="btn chico" type="submit">Guardar permiso</button><span class="nota" id="p-ok"></span></div>
       </form>
@@ -179,7 +181,7 @@ a.btn{text-decoration:none;display:inline-block}
 var ALOJADO = !!window.ASIS_ALOJADO;
 function b64aBytes(t){ t = t.replace(/-/g, "+").replace(/_/g, "/"); while (t.length % 4) t += "="; var b = atob(t), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
 function desdeCompacto(c){   // formato del enlace: {n, c, m, h, w, p: [[ci, nombre, cargo], ...]}
-  return { codigo: c.c, nombre: c.n, nombreQR: c.q || c.n, municipio: c.m || "", horaEntrada: c.h || "07:15", whatsapp: c.w || "",
+  return { codigo: c.c, nombre: c.n, nombreQR: c.q || c.n, municipio: c.m || "", horaEntrada: c.h || "07:15", whatsapp: c.w || "", llave: c.k || "", urlCentral: c.u || "",
            personal: (c.p || []).map(function(x){ return { ci: x[0], nombre: x[1], cargo: x[2] || "" }; }) };
 }
 function cargarConfig(){
@@ -218,7 +220,7 @@ function guardar(k, v){ try { localStorage.setItem(CLAVE + ":" + k, JSON.stringi
 var ajustes = Object.assign({hora: CFG.horaEntrada || "07:15", horaT: "13:00", corte: "12:30", correo: CFG.correo || "", url: CFG.urlHoja || "", wa: CFG.whatsapp || ""}, leer("ajustes", {}));
 if (!ajustes.horaT) ajustes.horaT = "13:00"; if (!ajustes.corte) ajustes.corte = "12:30";
 var eventos = leer("eventos", []);          // {id, fecha, hora, tipo, turno, ci, nombre, inst, enviado}
-var perfil = leer("perfil", {});            // ci -> {t: "M" | "T" | "A", cdce: true/false}
+var perfil = leer("perfil", {});            // ci -> {t: "M" | "T" | "A", cdce: true/false, d: [1..5] días que trabaja (si falta, todos)}
 var permisos = leer("permisos", []);        // {id, ci, nombre, motivo, desde, hasta}
 var disp = leer("disp", null); if (!disp){ disp = Math.random().toString(36).slice(2, 8); guardar("disp", disp); }
 
@@ -237,6 +239,9 @@ var porCI = {}; CFG.personal.forEach(function(p){ porCI[soloNum(p.ci)] = p; });
 var NT = { M: "mañana", T: "tarde" };
 function turnoDe(ci){ var p = perfil[ci]; return (p && p.t) || "M"; }
 function turnosDe(ci){ var t = turnoDe(ci); return t === "A" ? ["M", "T"] : [t]; }
+var DSEM = [1, 2, 3, 4, 5], LDIA = { 1: "L", 2: "M", 3: "Mi", 4: "J", 5: "V" };
+function diasDe(ci){ var p = perfil[ci]; return (p && p.d && p.d.length) ? p.d : DSEM; }
+function leToca(ci, fecha){ var q = fecha.split("-"), w = new Date(+q[0], +q[1]-1, +q[2]).getDay(); return w === 0 || w === 6 || diasDe(ci).indexOf(w) >= 0; }
 function esCDCE(ci){ return !!(perfil[ci] && perfil[ci].cdce); }
 function permisoDe(ci, fecha){ for (var i = 0; i < permisos.length; i++){ var x = permisos[i]; if (x.ci === ci && x.desde <= fecha && fecha <= x.hasta) return x; } return null; }
 function horaDe(t){ return t === "T" ? ajustes.horaT : ajustes.hora; }
@@ -306,7 +311,7 @@ function pitar(bien){
 
 /* ---------- vista ---------- */
 var diaVisto = hoyISO();
-/* Una fila por persona y turno. estado: "asistio" | "falta" | "permiso" | "cdce" | "fuera" (fuera de la nómina) */
+/* Una fila por persona y turno. estado: "asistio" | "falta" | "permiso" | "libre" (no tiene horario ese día) | "cdce" | "fuera" (fuera de la nómina) */
 function estadoDia(fecha){
   var filas = {};
   CFG.personal.forEach(function(p){ var ci = soloNum(p.ci);
@@ -318,10 +323,10 @@ function estadoDia(fecha){
   });
   var arr = Object.keys(filas).map(function(k){ var f = filas[k];
     f.cdce = esCDCE(f.ci); f.permiso = permisoDe(f.ci, fecha);
-    f.estado = f.ent ? "asistio" : (!f.nomina ? "fuera" : (f.cdce ? "cdce" : (f.permiso ? "permiso" : "falta")));
+    f.estado = f.ent ? "asistio" : (!f.nomina ? "fuera" : (f.cdce ? "cdce" : (f.permiso ? "permiso" : (leToca(f.ci, fecha) ? "falta" : "libre"))));
     f.tarde = !!f.ent && f.ent > horaDe(f.turno);
     return f; });
-  var orden = { asistio: 0, falta: 1, permiso: 2, cdce: 3, fuera: 4 };
+  var orden = { asistio: 0, falta: 1, permiso: 2, libre: 3, cdce: 4, fuera: 5 };
   arr.sort(function(a, b){ return orden[a.estado] - orden[b.estado] || (a.ent && b.ent ? a.ent.localeCompare(b.ent) : 0) || a.nombre.localeCompare(b.nombre) || a.turno.localeCompare(b.turno); });
   return arr;
 }
@@ -351,6 +356,7 @@ function pintar(){
       h.appendChild(document.createTextNode(hora12(f.ent) + (f.sal ? " – " + hora12(f.sal) : "")));
     } else if (f.estado === "permiso") { chip.className = "chip gris"; chip.textContent = f.permiso.motivo; h.appendChild(chip);
     } else if (f.estado === "cdce") { chip.className = "chip gris"; chip.textContent = "En el CDCE"; h.appendChild(chip);
+    } else if (f.estado === "libre") { chip.className = "chip gris"; chip.textContent = "No le toca este día"; h.appendChild(chip);
     } else { aus++; chip.className = "chip " + (diaVisto === hoy ? "gris" : "mal"); chip.textContent = diaVisto === hoy ? "Sin registrar" : "No asistió"; h.appendChild(chip);
       var bj = document.createElement("button"); bj.type = "button"; bj.className = "btn chico"; bj.style.marginTop = "4px"; bj.textContent = "Justificar";
       bj.addEventListener("click", (function(ci){ return function(){ abrirPermiso(ci, diaVisto); }; })(f.ci));
@@ -378,9 +384,9 @@ function pintar(){
   pintarMes(); pintarPersonal();
 }
 function numeroWA(t){ var d = soloNum(t); if (!d) return ""; if (d.charAt(0) === "0") d = "58" + d.slice(1); else if (d.length === 10) d = "58" + d; return d; }
-/* Cuentan para el porcentaje: personal de la nómina, que no sea del CDCE y que no tenga permiso ese día (si vino con permiso, cuenta). */
+/* Cuentan para el porcentaje: personal de la nómina, que no sea del CDCE, que tenga horario ese día y que no tenga permiso (si vino con permiso o sin tocarle, cuenta). */
 function porcentaje(filas){
-  var esp = filas.filter(function(f){ return f.nomina && !f.cdce && (f.ent || !f.permiso); });
+  var esp = filas.filter(function(f){ return f.nomina && !f.cdce && f.estado !== "libre" && (f.ent || !f.permiso); });
   if (!esp.length) return null;
   var en = esp.filter(function(f){ return f.ent; }).length;
   return { pct: Math.round(en * 100 / esp.length), en: en, total: esp.length };
@@ -398,6 +404,7 @@ function reporte(fecha){
   si.forEach(function(f){ t += "• " + f.nombre + (dosT ? " (" + NT[f.turno] + ")" : "") + "  " + hora12(f.ent) + (f.tarde ? " (llegó tarde)" : "") + (f.sal ? " – salida " + hora12(f.sal) : "") + "\n"; });
   if (CFG.personal.length) { t += "\nNo registraron asistencia: " + no.length + "\n"; no.forEach(function(f){ t += "• " + f.nombre + (dosT ? " (" + NT[f.turno] + ")" : "") + "\n"; }); }
   lista("Con permiso o reposo (no cuentan como falta)", pe, function(f){ return " – " + f.permiso.motivo; });
+  lista("Sin horario este día (no cuentan como falta)", de("libre"));
   lista("Adscritos al CDCE (no cuentan)", cd.concat(cdVino));
   lista("Fuera de la nómina", fu, function(f){ return "  " + hora12(f.ent); });
   return t;
@@ -453,8 +460,8 @@ function csvMes(ym){
   var r = resumenMes(ym), q = function(v){ return '"' + String(v).replace(/"/g, '""') + '"'; };
   var TN = { M: "Mañana", T: "Tarde", A: "Ambos" };
   var L = [["Institución", CFG.nombre], ["Mes", nombreMes(ym)], ["Días de clase registrados", r.dias.length], ["Asistencia general", r.pct + " %"], [],
-           ["Cédula", "Nombre", "Cargo", "Turno", "Situación", "Asistencias", "Inasistencias", "Llegadas tarde", "% asistencia", "Días que faltó", "Permisos y reposos"]];
-  r.filas.forEach(function(x){ L.push([x.ci, x.nombre, x.cargo, TN[x.turno], x.cdce ? "Adscrito al CDCE" : "En la escuela", x.asis, x.cdce ? "" : x.inas, x.tarde,
+           ["Cédula", "Nombre", "Cargo", "Turno", "Días que trabaja", "Situación", "Asistencias", "Inasistencias", "Llegadas tarde", "% asistencia", "Días que faltó", "Permisos y reposos"]];
+  r.filas.forEach(function(x){ L.push([x.ci, x.nombre, x.cargo, TN[x.turno], diasDe(x.ci).map(function(d){ return LDIA[d]; }).join(" "), x.cdce ? "Adscrito al CDCE" : "En la escuela", x.asis, x.cdce ? "" : x.inas, x.tarde,
     x.cdce ? "" : x.pct + " %", x.faltas.join(" "), x.perm.join("; ")]); });
   return "﻿" + L.map(function(f){ return f.map(q).join(";"); }).join("\r\n");
 }
@@ -473,9 +480,16 @@ function pintarPersonal(){
     var sc = document.createElement("select"); sc.className = "btn chico"; sc.setAttribute("aria-label", "Situación de " + p.nombre);
     [["", "En la escuela"], ["1", "Adscrito al CDCE"]].forEach(function(o){ var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; sc.appendChild(op); });
     sc.value = esCDCE(ci) ? "1" : "";
-    var cambia = function(){ perfil[ci] = { t: st.value, cdce: sc.value === "1" }; guardar("perfil", perfil); pintar(); };
-    st.addEventListener("change", cambia); sc.addEventListener("change", cambia);
-    h.appendChild(st); h.appendChild(document.createElement("br")); h.appendChild(sc); h.style.fontFamily = "inherit";
+    var dv = document.createElement("div"), cajas = []; dv.className = "dias"; dv.setAttribute("aria-label", "Días que trabaja " + p.nombre);
+    DSEM.forEach(function(d){ var lb = document.createElement("label"), cb = document.createElement("input"); cb.type = "checkbox"; cb.value = d;
+      cb.checked = diasDe(ci).indexOf(d) >= 0; lb.appendChild(cb); lb.appendChild(document.createTextNode(LDIA[d])); dv.appendChild(lb); cajas.push(cb); });
+    var cambia = function(){
+      var d = cajas.filter(function(c){ return c.checked; }).map(function(c){ return +c.value; });
+      if (!d.length) { cajas.forEach(function(c){ c.checked = true; }); d = DSEM.slice(); }   // nadie trabaja cero días: se vuelve a todos
+      var x = { t: st.value, cdce: sc.value === "1" }; if (d.length < 5) x.d = d;
+      perfil[ci] = x; guardar("perfil", perfil); pintar(); };
+    st.addEventListener("change", cambia); sc.addEventListener("change", cambia); cajas.forEach(function(c){ c.addEventListener("change", cambia); });
+    h.appendChild(st); h.appendChild(document.createElement("br")); h.appendChild(sc); h.appendChild(dv); h.style.fontFamily = "inherit";
     li.appendChild(n); li.appendChild(h); li.appendChild(c); ul.appendChild(li);
     var op = document.createElement("option"); op.value = ci; op.textContent = p.nombre; sel.appendChild(op);
   });
@@ -502,7 +516,7 @@ function pintarMes(){
   sel.value = mesVisto;
   var r = resumenMes(mesVisto), txt = textoMes(mesVisto);
   document.getElementById("t-mes").value = txt;
-  document.getElementById("m-nota").textContent = "Cuenta como día de clase cada día en que se escaneó al menos un carnet. Los permisos, reposos y el personal adscrito al CDCE no cuentan como falta. " +
+  document.getElementById("m-nota").textContent = "Cuenta como día de clase cada día en que se escaneó al menos un carnet. Los permisos, reposos, los días sin horario y el personal adscrito al CDCE no cuentan como falta. " +
     (r.dias.length ? r.dias.length + " día(s) en " + nombreMes(mesVisto) + "." : "");
   document.getElementById("m-wa").href = "https://wa.me/" + numeroWA(ajustes.wa) + "?text=" + encodeURIComponent(txt);
   document.getElementById("m-correo").href = "mailto:" + encodeURIComponent(ajustes.correo).replace(/%40/g, "@") +
@@ -524,9 +538,42 @@ function sincronizar(){
     .catch(function(){ return false; })
     .then(function(v){ enviando = false; pintar(); if (v && eventos.some(function(e){ return !e.enviado; })) sincronizar(); return v; });
 }
-function red(){ var on = navigator.onLine, p = document.getElementById("h-red"); p.className = "pill" + (on ? "" : " off"); p.textContent = on ? "Con internet" : "Sin internet: guardando en el teléfono"; if (on) sincronizar(); }
+/* ---------- envío a la hoja central del estado (zona educativa) ----------
+   Por cada día con registros (últimos 10 días) se envía el resumen de la escuela y solo las novedades:
+   inasistencias sin justificar, llegadas tarde y permisos. Solo se reenvía un día si cambió algo. */
+var URL_CENTRAL = CFG.urlCentral || "";
+var central = leer("central", {}), enviandoC = false;
+function paqueteDia(d){
+  var filas = estadoDia(d).filter(function(f){ return f.nomina; }), pc = porcentaje(filas), cuenta = function(e){ return filas.filter(function(f){ return f.estado === e; }).length; };
+  var nov = [];
+  filas.forEach(function(f){
+    var base = { ci: f.ci, nombre: f.nombre, cargo: f.cargo || "", turno: NT[f.turno] };
+    if (f.estado === "falta") nov.push(Object.assign(base, { novedad: "INASISTENCIA SIN JUSTIFICAR", detalle: "" }));
+    else if (f.estado === "permiso") nov.push(Object.assign(base, { novedad: "PERMISO", detalle: f.permiso.motivo }));
+    else if (f.estado === "asistio" && f.tarde && !f.cdce) nov.push(Object.assign(base, { novedad: "LLEGÓ TARDE", detalle: "Entrada " + hora12(f.ent) }));
+  });
+  return { fecha: d, enCurso: d === hoyISO(), esperados: pc ? pc.total : 0, asistieron: pc ? pc.en : 0,
+           tarde: filas.filter(function(f){ return f.estado === "asistio" && f.tarde && !f.cdce; }).length,
+           faltas: cuenta("falta"), permisos: cuenta("permiso"), cdce: filas.filter(function(f){ return f.cdce; }).length,
+           libres: cuenta("libre"), pct: pc ? pc.pct : null, novedades: nov };
+}
+function sincronizarCentral(){
+  if (!URL_CENTRAL || !CFG.llave || enviandoC || !navigator.onLine) return;
+  var hoy = hoyISO(), lim = hoyISO(new Date(Date.now() - 10 * 864e5)), dias = {};
+  eventos.forEach(function(e){ if (e.fecha >= lim && e.fecha <= hoy) dias[e.fecha] = 1; });
+  var cambios = Object.keys(dias).sort().map(paqueteDia).filter(function(x){ return central[x.fecha] !== JSON.stringify(x); });
+  if (!cambios.length) return;
+  enviandoC = true;
+  fetch(URL_CENTRAL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ tipo: "dia", codigo: CFG.codigo, llave: CFG.llave, escuela: CFG.nombre, municipio: CFG.municipio, dias: cambios }) })
+    .then(function(r){ return r.json(); })
+    .then(function(r){ if (r && r.ok) { cambios.forEach(function(x){ central[x.fecha] = JSON.stringify(x); });
+      Object.keys(central).forEach(function(k){ if (k < lim) delete central[k]; }); guardar("central", central); } })
+    .catch(function(){}).then(function(){ enviandoC = false; });
+}
+function red(){ var on = navigator.onLine, p = document.getElementById("h-red"); p.className = "pill" + (on ? "" : " off"); p.textContent = on ? "Con internet" : "Sin internet: guardando en el teléfono"; if (on) { sincronizar(); sincronizarCentral(); } }
 window.addEventListener("online", red); window.addEventListener("offline", red);
-setInterval(function(){ pintar(); sincronizar(); }, 60000);
+setInterval(function(){ pintar(); sincronizar(); sincronizarCentral(); }, 60000);
 
 /* ---------- cámara ---------- */
 var video = document.getElementById("video"), flujo = null, detector = null, lienzo = document.createElement("canvas"), ctx = lienzo.getContext("2d", { willReadFrequently: true }), bloqueo = null;
