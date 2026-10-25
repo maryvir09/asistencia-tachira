@@ -541,7 +541,7 @@ function sincronizar(){
 /* ---------- envío a la hoja central del estado (zona educativa) ----------
    Por cada día con registros (últimos 10 días) se envía el resumen de la escuela y solo las novedades:
    inasistencias sin justificar, llegadas tarde y permisos. Solo se reenvía un día si cambió algo. */
-var URL_CENTRAL = CFG.urlCentral || "";
+var URL_CENTRAL = CFG.urlCentral || "https://script.google.com/macros/s/AKfycbyTgq-Y9xUADhXCfAq5INlfg8ECkLr-eXyx5clb-fMeCD1KlVKv3AteBb6tYzkV6gSZgQ/exec";
 var central = leer("central", {}), enviandoC = false;
 function paqueteDia(d){
   var filas = estadoDia(d).filter(function(f){ return f.nomina; }), pc = porcentaje(filas), cuenta = function(e){ return filas.filter(function(f){ return f.estado === e; }).length; };
