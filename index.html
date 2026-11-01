@@ -252,10 +252,13 @@ function conTurno(f){ return hayTarde() ? " (" + NT[f.turno] + ")" : ""; }
 /* Lee el texto del QR del carnet: "INSTITUCIÓN\nNOMBRE\nC.I.: V-12345678" */
 function leerQR(txt){
   var lineas = String(txt).split(/\r?\n/).map(function(s){ return s.trim(); }).filter(Boolean);
-  var m = String(txt).match(/C\.?\s*I\.?\s*:?\s*([VE])?-?\s*([\d.]{5,12})/i) || String(txt).match(/^\s*([VE])?-?([\d.]{5,12})\s*$/i);
+  // La línea de la cédula es la que EMPIEZA por "C.I." seguida del número. Antes se buscaba "CI" en cualquier parte
+  // y fallaba con nombres o escuelas que contienen esas letras (PATRICIA, LUCÍA, CECILIA, FRANCISCO, INSTITUCIÓN...).
+  var RCI = /^C\.?\s*I\.?\s*:?\s*([VE])?-?\s*([\d.]{5,12})/i;
+  var idx = lineas.findIndex(function(l){ return RCI.test(l); });
+  var m = (idx >= 0 ? lineas[idx].match(RCI) : null) || String(txt).match(/C\.?\s*I\.?\s*:?\s*([VE])?-?\s*([\d.]{5,12})/i) || String(txt).match(/^\s*([VE])?-?([\d.]{5,12})\s*$/i);
   if (!m) return null;
   var ci = soloNum(m[2]);
-  var idx = lineas.findIndex(function(l){ return /C\.?\s*I/i.test(l); });
   return { ci: ci, letra: (m[1] || "V").toUpperCase(),
            nombre: idx > 0 ? lineas[idx-1] : "", inst: idx > 1 ? lineas.slice(0, idx-1).join(" ") : "" };
 }
