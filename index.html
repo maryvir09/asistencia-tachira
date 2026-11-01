@@ -210,6 +210,7 @@ cargarConfig().then(function(c){
   if (ALOJADO && "serviceWorker" in navigator) { try { navigator.serviceWorker.register("sw.js").catch(function(){}); } catch(e){} }
 });
 function iniciar(CFG){
+try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function(){}); } catch(e){}   // pide al teléfono no borrar solo los registros guardados
 CFG.nombre = CFG.nombre || "ESCUELA";
 CFG.personal = CFG.personal || [];
 var CLAVE = "asis:" + (CFG.codigo || CFG.nombre);
@@ -241,7 +242,7 @@ function turnoDe(ci){ var p = perfil[ci]; return (p && p.t) || "M"; }
 function turnosDe(ci){ var t = turnoDe(ci); return t === "A" ? ["M", "T"] : [t]; }
 var DSEM = [1, 2, 3, 4, 5], LDIA = { 1: "L", 2: "M", 3: "Mi", 4: "J", 5: "V" };
 function diasDe(ci){ var p = perfil[ci]; return (p && p.d && p.d.length) ? p.d : DSEM; }
-function leToca(ci, fecha){ var q = fecha.split("-"), w = new Date(+q[0], +q[1]-1, +q[2]).getDay(); return w === 0 || w === 6 || diasDe(ci).indexOf(w) >= 0; }
+function leToca(ci, fecha){ var q = fecha.split("-"), w = new Date(+q[0], +q[1]-1, +q[2]).getDay(); if (w === 0 || w === 6) return false; return diasDe(ci).indexOf(w) >= 0; }   // sábado y domingo no cuentan como falta; quien escanee ese día sí cuenta como asistencia
 function esCDCE(ci){ return !!(perfil[ci] && perfil[ci].cdce); }
 function permisoDe(ci, fecha){ for (var i = 0; i < permisos.length; i++){ var x = permisos[i]; if (x.ci === ci && x.desde <= fecha && fecha <= x.hasta) return x; } return null; }
 function horaDe(t){ return t === "T" ? ajustes.horaT : ajustes.hora; }
