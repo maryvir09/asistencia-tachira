@@ -57,10 +57,10 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return
 function bs(n){return Number(n).toLocaleString('es-VE');}
 async function srv(fn){
   var a=[].slice.call(arguments,1), r, x;
-  var veces = (fn==='inicio'||fn==='fotoPersona') ? 2 : 1;   // solo se reintenta lo que no guarda nada
+  var veces = (fn==='inicio'||fn==='fotoPersona'||fn==='subirCapture') ? 2 : 1;   // solo se reintenta lo que no guarda nada
   for (var intento=0; intento<veces; intento++){
     try{ r = await fetch(API, {method:'POST', body: JSON.stringify({fn:fn, args:a}), headers:{'Content-Type':'text/plain;charset=utf-8'}}); x = await r.json(); break; }
-    catch(e){ if (intento===veces-1) throw (fn==='inicio'||fn==='fotoPersona') ? 'No hay conexión con el sistema. Revise su internet e intente de nuevo.' : 'Se cortó la conexión. Antes de repetir, recargue la página y revise si ya quedó guardado.'; await new Promise(function(ok){setTimeout(ok,1500);}); }
+    catch(e){ if (intento===veces-1) throw (fn==='inicio'||fn==='fotoPersona'||fn==='subirCapture') ? 'No hay conexión con el sistema. Revise su internet e intente de nuevo.' : 'Se cortó la conexión. Antes de repetir, recargue la página y revise si ya quedó guardado.'; await new Promise(function(ok){setTimeout(ok,1500);}); }
   }
   if (!x || !x.ok) throw (x && x.error) || 'El sistema no respondió. Intente de nuevo.';
   return x.data;
@@ -162,51 +162,58 @@ function fechaVE(iso){ var m=String(iso||'').split('-'); return m.length===3? m[
 function diaAntes(iso){ var p=iso.split('-'), d=new Date(+p[0],+p[1]-1,+p[2]-1); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
 function precioEn(iso){ var P=D.precios||{base:D.precio}; return (P.desde && iso && iso>=P.desde) ? P.nuevo : P.base; }
 
-var MAXT = 6, BANCOS = ['Banco de Venezuela','Banesco','Mercantil','Provincial (BBVA)','Bicentenario','Banco del Tesoro','Bancaribe','BNC (Nacional de Crédito)','Exterior','Banco Plaza','Venezolano de Crédito','Sofitasa','Banco Activo','Bancamiga','100% Banco','Banplus','Fondo Común (BFC)','Banco Caroní','Banco Agrícola','Del Sur','Otro'];
+var MAXT = 300, NB = 0, BANCOS = ['Banco de Venezuela','Banesco','Mercantil','Provincial (BBVA)','Bicentenario','Banco del Tesoro','Bancaribe','BNC (Nacional de Crédito)','Exterior','Banco Plaza','Venezolano de Crédito','Sofitasa','Banco Activo','Bancamiga','100% Banco','Banplus','Fondo Común (BFC)','Banco Caroní','Banco Agrícola','Del Sur','Otro'];
+var SUBIDOS = {};   // capture ya subido por casilla: {i: {file, id}} (si algo falla, no se vuelve a subir)
+function bloque(i){
+  var d=document.createElement('div'); d.className='card'; d.id='tB'+i; d.style.cssText='margin:12px 0;background:#faf9fe';
+  d.innerHTML='<h2 style="font-size:16px">Transferencia '+(i+1)+'</h2>'+
+   '<label>Monto que transfirió (Bs)</label><input id="tM'+i+'" inputmode="decimal" oninput="resumenPago()">'+
+   '<label>Fecha de la transferencia</label><input id="tF'+i+'" type="date" max="'+esc(D.hoy||'')+'" onchange="resumenPago()" oninput="resumenPago()">'+
+   '<div class="muted" id="tV'+i+'"></div>'+
+   '<label>Número de referencia completo</label><input id="tR'+i+'" inputmode="numeric">'+
+   '<label>Banco desde donde pagó</label><select id="tBa'+i+'"><option value="">— elija —</option>'+BANCOS.map(function(b){return '<option>'+esc(b)+'</option>';}).join('')+'</select>'+
+   '<label>Cuenta a la que pagó</label><select id="tC'+i+'"><option value="">— elija —</option><option value="Virginia">María Virginia Duque</option><option value="Edison">Edison Méndez</option><option value="Rossy">Rossy Daniela Camargo</option></select>'+
+   '<label>Capture de esta transferencia</label><input id="tK'+i+'" type="file" accept="image/*"><div class="muted">Toque la casilla y elija la foto del capture en su galería.</div>';
+  return d;
+}
 function formPago(){
   var c = D.cuentas.length ? '<div class="muted" style="white-space:pre-line;margin-bottom:6px">'+esc(D.cuentas.join('\n\n'))+'</div>' : '';
-  ESTADO.vista='pago'; window.scrollTo(0,0);
-  var bloques='';
-  for (var i=0;i<MAXT;i++){
-    bloques += '<div class="card'+(i?' oculto':'')+'" id="tB'+i+'" style="margin:12px 0;background:#faf9fe">'+
-     '<h2 style="font-size:16px">Transferencia <span class="tN">'+(i+1)+'</span></h2>'+
-     '<label>Monto que transfirió (Bs)</label><input id="tM'+i+'" inputmode="decimal" oninput="resumenPago()">'+
-     '<label>Fecha de la transferencia</label><input id="tF'+i+'" type="date" max="'+esc(D.hoy||'')+'" onchange="resumenPago()" oninput="resumenPago()">'+
-     '<div class="muted" id="tV'+i+'"></div>'+
-     '<label>Número de referencia completo</label><input id="tR'+i+'" inputmode="numeric">'+
-     '<label>Banco desde donde pagó</label><select id="tBa'+i+'"><option value="">— elija —</option>'+BANCOS.map(function(b){return '<option>'+esc(b)+'</option>';}).join('')+'</select>'+
-     '<label>Cuenta a la que pagó</label><select id="tC'+i+'"><option value="">— elija —</option><option value="Virginia">María Virginia Duque</option><option value="Edison">Edison Méndez</option><option value="Rossy">Rossy Daniela Camargo</option></select>'+
-     '<label>Capture de esta transferencia</label><input id="tK'+i+'" type="file" accept="image/*"><div class="muted">Toque la casilla y elija la foto del capture en su galería.</div></div>';
-  }
-  var opc=''; for (var n=1;n<=MAXT;n++) opc+='<option value="'+n+'">'+n+(n===1?' transferencia':' transferencias')+'</option>';
+  ESTADO.vista='pago'; NB=0; SUBIDOS={}; window.scrollTo(0,0);
   $('app').innerHTML=('<div class="card"><div class="fila" style="justify-content:space-between"><h2>Registrar pago</h2><button class="sec" onclick="volver()">← Volver</button></div>'+c+
    '<p class="muted">Precio: <b>'+bs(D.precio)+' Bs por carnet</b>.'+reglaPrecio()+'</p>'+
    '<label>¿Cuántos carnets paga?</label><input id="pCant" type="number" min="1" inputmode="numeric" oninput="resumenPago()">'+
-   '<label>¿En cuántas transferencias pagó?</label><select id="pNT" onchange="verBloques()">'+opc+'</select>'+
-   '<div class="muted">Si pagó el total de una vez, deje «1 transferencia». Si pagó por partes, elija cuántas y llene cada una con su capture.</div>'+
-   bloques+
+   '<label>¿En cuántas transferencias pagó?</label><input id="pNT" type="number" min="1" max="'+MAXT+'" value="1" inputmode="numeric" oninput="verBloques()">'+
+   '<div class="muted">Si pagó el total de una vez, deje 1. Si pagaron por partes (por ejemplo, cada persona su carnet), escriba cuántas transferencias son y llene cada una con su capture.</div>'+
+   '<div id="tLista"></div>'+
    '<div id="pRes"></div><div id="pErr"></div><button class="full" style="margin-top:14px" onclick="enviarPago()">Registrar pago</button></div>');
+  verBloques();
+}
+function nT(){ var n=Math.floor(+$('pNT').value||1); return Math.max(1, Math.min(MAXT, n)); }
+function verBloques(){
+  var n=nT(), L=$('tLista');
+  while (NB<n){ var b=bloque(NB); L.appendChild(b);
+    if (NB>0){ $('tC'+NB).value=$('tC0').value; }   // la cuenta se copia de la primera; se puede cambiar
+    NB++; }
+  for (var i=0;i<NB;i++) $('tB'+i).classList.toggle('oculto', i>=n);
+  $('tB0').querySelector('h2').style.display = n>1?'':'none';
   resumenPago();
 }
-function nT(){ return +$('pNT').value||1; }
-function verBloques(){ for (var i=0;i<MAXT;i++) $('tB'+i).classList.toggle('oculto', i>=nT()); $('tB0').querySelector('h2').style.display = nT()>1?'':'none'; resumenPago(); }
 function leerTransf(){
-  var T=[]; for (var i=0;i<nT();i++) T.push({ monto:montoVE($('tM'+i).value), fecha:$('tF'+i).value, referencia:$('tR'+i).value, banco:$('tBa'+i).value, cuenta:$('tC'+i).value, file:$('tK'+i).files[0] });
+  var T=[]; for (var i=0;i<nT();i++) T.push({ i:i, monto:montoVE($('tM'+i).value), fecha:$('tF'+i).value, referencia:$('tR'+i).value, banco:$('tBa'+i).value, cuenta:$('tC'+i).value, file:$('tK'+i).files[0] });
   return T;
 }
 function resumenPago(){
-  if (!$('pRes')) return;
-  if ($('tB0')) $('tB0').querySelector('h2').style.display = nT()>1?'':'none';
-  var cant=+$('pCant').value||0, T=leerTransf(), valor=0, total=0, completo=true;
-  T.forEach(function(t,i){
+  if (!$('pRes') || !$('tB0')) return;
+  var cant=+$('pCant').value||0, T=leerTransf(), valor=0, total=0, faltan=0;
+  T.forEach(function(t){
     var p = t.fecha ? precioEn(t.fecha) : 0;
-    $('tV'+i).innerHTML = t.fecha ? 'Para esta fecha: '+bs(p)+' Bs por carnet' : '';
-    if (!(t.monto>0) || !t.fecha) { completo=false; return; }
+    $('tV'+t.i).innerHTML = t.fecha ? 'Para esta fecha: '+bs(p)+' Bs por carnet' : '';
+    if (!(t.monto>0) || !t.fecha) { faltan++; return; }
     total += t.monto; valor += t.monto/p;
   });
   var v = Math.round(valor*100)/100, h='';
   if (!cant) h = '';
-  else if (!completo) h = '<div class="aviso">Llene el monto y la fecha de cada transferencia para ver si cuadra con '+cant+' carnet(s).</div>';
+  else if (faltan) h = '<div class="aviso">Faltan el monto o la fecha en '+faltan+' transferencia(s). Llénelas todas para ver si cuadra con '+cant+' carnet(s).'+(total?' Van '+bs(total)+' Bs.':'')+'</div>';
   else if (Math.abs(valor-cant)<=0.001) h = '<div class="bien">Cuadra: '+bs(total)+' Bs = '+cant+' carnet(s). ✓</div>';
   else h = '<div class="err">No cuadra: lo transferido ('+bs(total)+' Bs) alcanza para '+v.toLocaleString('es-VE')+' carnet(s) y usted indicó '+cant+'.</div>';
   $('pRes').innerHTML = h;
@@ -222,21 +229,30 @@ async function enviarPago(){
     if(!t.fecha) return err('Indique la fecha'+n+'.');
     if(D.hoy && t.fecha>D.hoy) return err('La fecha'+n+' no puede ser futura.');
     var r=String(t.referencia).replace(/\D/g,''); if(r.length<6) return err('Escriba la referencia completa'+n+'.');
-    if(refs[r.slice(-6)]) return err('La referencia'+n+' está repetida.'); refs[r.slice(-6)]=1;
+    var kr=r.slice(-6)+'|'+t.monto+'|'+t.fecha, rep=refs[r]||refs[kr];
+    if(rep) return err('La referencia'+n+' está repetida (es igual a la de la transferencia '+rep+').'); refs[r]=refs[kr]=i+1;
     if(!t.banco) return err('Elija el banco desde donde pagó'+n+'.');
     if(!t.cuenta) return err('Indique a qué cuenta pagó'+n+'.');
     if(!t.file) return err('Suba el capture'+n+'.');
     valor += t.monto/precioEn(t.fecha);
   }
   if (Math.abs(valor-cant)>0.001) return err('Lo transferido alcanza para '+(Math.round(valor*100)/100).toLocaleString('es-VE')+' carnet(s) y usted indicó '+cant+'. Revise los montos y las fechas.'+(reglaPrecio()?' Recuerde: '+reglaPrecio().replace(/<[^>]+>/g,''):''));
-  cargando('Registrando pago…');
+  velo('<h2>Registrando pago…</h2><div class="barra"><i id="pBar" style="width:5%"></i></div><p class="muted" id="pBarT">Preparando…</p><p class="muted">No cierre esta página.</p>');
   try{
     var datos={cantidad:cant, transferencias:[]};
     for (var j=0;j<T.length;j++){
-      var cap = await reducir(T[j].file, 1400, 1400, 0.85).catch(function(){ throw 'No se pudo leer la imagen del capture'+(T.length>1?' de la transferencia '+(j+1):'')+'. Use una foto JPG o una captura de pantalla.'; });
-      datos.transferencias.push({monto:T[j].monto, fecha:T[j].fecha, referencia:T[j].referencia, banco:T[j].banco, cuenta:T[j].cuenta, capture:cap.url});
+      var s = SUBIDOS[T[j].i];
+      if (!s || s.file!==T[j].file){
+        $('pBarT').textContent = 'Subiendo capture '+(j+1)+' de '+T.length+'…';
+        var cap = await reducir(T[j].file, 1200, 1600, 0.8).catch(function(){ throw 'No se pudo leer la imagen del capture'+(T.length>1?' de la transferencia '+(j+1):'')+'. Use una foto JPG o una captura de pantalla.'; });
+        var up = await srv('subirCapture', PARAMS.e, PARAMS.k, cap.url, T[j].referencia);
+        s = SUBIDOS[T[j].i] = { file:T[j].file, id:up.id };
+      }
+      $('pBar').style.width = Math.round(5+90*(j+1)/T.length)+'%';
+      datos.transferencias.push({monto:T[j].monto, fecha:T[j].fecha, referencia:T[j].referencia, banco:T[j].banco, cuenta:T[j].cuenta, captureId:s.id});
     }
-    var r = await srv('registrarPago', PARAMS.e, PARAMS.k, datos); ESTADO.vista='inicio'; refrescar(r); cerrarVelo(); window.scrollTo(0,0);
+    $('pBarT').textContent = 'Registrando…';
+    var r = await srv('registrarPago', PARAMS.e, PARAMS.k, datos); ESTADO.vista='inicio'; SUBIDOS={}; refrescar(r); cerrarVelo(); window.scrollTo(0,0);
   }catch(e){ cerrarVelo(); err(e); }
 }
 
