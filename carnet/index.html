@@ -119,10 +119,19 @@ function tarjetaLote(l){
   var ps = personasDe(l.lote), abierto = ['PAGO EN ESPERA','ABIERTO'].indexOf(l.estado)>=0;
   var h = '<div class="card"><div class="fila" style="justify-content:space-between"><h2>Grupo de '+l.cupos+' carnet'+(l.cupos>1?'s':'')+'</h2>'+chipLote(l)+'</div>';
   var et={'EN ESPERA':'<span class="chip warn">en espera</span>','CONFIRMADO':'<span class="chip ok">confirmado</span>','RECHAZADO':'<span class="chip bad">rechazado</span>','ANULADO':'<span class="chip">anulado</span>'};
-  (l.pagos||[]).forEach(function(t){
-    h += '<div class="muted">Transferencia ref. …'+esc(String(t.ref).slice(-6))+' · '+bs(t.monto)+' Bs'+(t.fecha?' · '+esc(t.fecha):'')+' '+(l.pagos.length>1?(et[t.estado]||''):'')+'</div>';
+  var porReemplazar = (l.pagos||[]).filter(function(t){ return t.estado==='RECHAZADO' && !t.reemplazada && l.estado==='PAGO EN ESPERA'; });
+  var vivas = (l.pagos||[]).filter(function(t){ return !t.reemplazada; }), muchas = vivas.length>5, lista='';
+  if (muchas) { var cu={}; vivas.forEach(function(t){ cu[t.estado]=(cu[t.estado]||0)+1; });
+    h += '<div class="muted">'+vivas.length+' transferencias · '+bs(vivas.reduce(function(a,t){return a+t.monto;},0))+' Bs · '+Object.keys(cu).map(function(k){return cu[k]+' '+(({'EN ESPERA':'en espera','CONFIRMADO':'confirmadas','RECHAZADO':'rechazadas'})[k]||k.toLowerCase());}).join(', ')+'</div>'; }
+  vivas.forEach(function(t){
+    var pend = porReemplazar.indexOf(t)>=0;
+    var linea = '<div class="muted">Transferencia ref. …'+esc(String(t.ref).slice(-6))+' · '+bs(t.monto)+' Bs'+(t.fecha?' · '+esc(t.fecha):'')+' '+(vivas.length>1||pend?(et[t.estado]||''):'')+'</div>';
+    if (muchas && !pend) { lista += linea; return; }
+    h += linea;
+    if (pend) h += '<div class="err" style="margin:6px 0">La coordinación rechazó esta transferencia'+(t.nota?': '+esc(t.nota):'')+'. Suba la transferencia correcta en su lugar; las demás siguen igual.<button class="full" style="margin-top:8px" onclick="formReemplazo(\''+esc(l.lote)+'\',\''+esc(t.id)+'\')">Subir la transferencia correcta</button></div>';
   });
-  if (l.estado==='PAGO EN ESPERA') h += '<div class="aviso">El pago se confirma cuando la coordinación carga el estado de cuenta (todos los días después de la 1:00 p. m.'+(D.ultimaCarga?'; última carga: '+esc(D.ultimaCarga):'')+'). Mientras tanto ya puede cargar a su personal.</div>';
+  if (lista) h += '<details style="margin:4px 0"><summary class="muted" style="cursor:pointer">Ver todas las transferencias</summary>'+lista+'</details>';
+  if (l.estado==='PAGO EN ESPERA' && !porReemplazar.length) h += '<div class="aviso">El pago se confirma cuando la coordinación carga el estado de cuenta (todos los días después de la 1:00 p. m.'+(D.ultimaCarga?'; última carga: '+esc(D.ultimaCarga):'')+'). Mientras tanto ya puede cargar a su personal.</div>';
   if (l.estado==='PAGO RECHAZADO') { var rj=(l.pagos||[]).filter(function(t){return t.estado==='RECHAZADO';})[0]; h += '<div class="err">La coordinación no encontró este pago'+(rj?' (ref. …'+esc(String(rj.ref).slice(-6))+')':'')+'. '+esc(rj&&rj.nota||'')+' Registre el pago de nuevo con los datos correctos.</div>'; }
   h += '<div class="barra" style="margin:10px 0"><i style="width:'+Math.round(100*ps.length/l.cupos)+'%"></i></div><div class="muted">'+ps.length+' de '+l.cupos+' cargados</div>';
   ps.forEach(function(p){
@@ -253,6 +262,45 @@ async function enviarPago(){
     }
     $('pBarT').textContent = 'Registrando…';
     var r = await srv('registrarPago', PARAMS.e, PARAMS.k, datos); ESTADO.vista='inicio'; SUBIDOS={}; refrescar(r); cerrarVelo(); window.scrollTo(0,0);
+  }catch(e){ cerrarVelo(); err(e); }
+}
+
+// ---------------------------------------------------------------- reemplazar una transferencia rechazada
+function formReemplazo(lote, id){
+  var l = D.lotes.filter(function(x){return x.lote===lote;})[0], t = l && (l.pagos||[]).filter(function(x){return x.id===id;})[0]; if(!t) return;
+  ESTADO.vista='pago'; NB=0; SUBIDOS={}; ESTADO.reemplazo={id:id, valor:t.valor}; window.scrollTo(0,0);
+  var c = D.cuentas.length ? '<div class="muted" style="white-space:pre-line;margin-bottom:6px">'+esc(D.cuentas.join('\n\n'))+'</div>' : '';
+  $('app').innerHTML='<div class="card"><div class="fila" style="justify-content:space-between"><h2>Transferencia correcta</h2><button class="sec" onclick="volver()">← Volver</button></div>'+
+    '<div class="err">Rechazada: ref. …'+esc(String(t.ref).slice(-6))+' · '+bs(t.monto)+' Bs · '+esc(t.fecha)+(t.nota?'<br>Motivo: '+esc(t.nota):'')+'</div>'+c+
+    '<p class="muted">La nueva transferencia debe valer lo mismo: <b>'+String(t.valor).replace('.',',')+' carnet(s)</b>.'+reglaPrecio()+'</p>'+
+    '<div id="tLista"></div><div id="pRes"></div><div id="pErr"></div><button class="full" style="margin-top:14px" onclick="enviarReemplazo()">Enviar la transferencia correcta</button></div>';
+  $('tLista').appendChild(bloque(0)); NB=1; $('tB0').querySelector('h2').style.display='none';
+  ['tM0','tF0'].forEach(function(k){ $(k).oninput=resumenReemplazo; $(k).onchange=resumenReemplazo; });
+}
+function resumenReemplazo(){
+  var m=montoVE($('tM0').value), f=$('tF0').value, R=ESTADO.reemplazo; if(!f){ $('tV0').innerHTML=''; $('pRes').innerHTML=''; return; }
+  var p=precioEn(f), debe=Math.round(R.valor*p*100)/100; $('tV0').innerHTML='Para esta fecha: '+bs(p)+' Bs por carnet';
+  $('pRes').innerHTML = !(m>0) ? '<div class="aviso">Con esa fecha, el monto debe ser '+bs(debe)+' Bs.</div>' :
+    (Math.abs(m/p-R.valor)<=0.001 ? '<div class="bien">Cuadra: '+bs(m)+' Bs. ✓</div>' : '<div class="err">Con esa fecha, el monto debe ser '+bs(debe)+' Bs.</div>');
+}
+async function enviarReemplazo(){
+  var t={monto:montoVE($('tM0').value), fecha:$('tF0').value, referencia:$('tR0').value, banco:$('tBa0').value, cuenta:$('tC0').value, file:$('tK0').files[0]}, R=ESTADO.reemplazo;
+  var err=function(m){$('pErr').innerHTML='<div class="err">'+esc(m)+'</div>'; aviso(m);};
+  if(!(t.monto>0)) return err('Escriba el monto.');
+  if(!t.fecha) return err('Indique la fecha.');
+  if(D.hoy && t.fecha>D.hoy) return err('La fecha no puede ser futura.');
+  if(String(t.referencia).replace(/\D/g,'').length<6) return err('Escriba la referencia completa.');
+  if(!t.banco) return err('Elija el banco desde donde pagó.');
+  if(!t.cuenta) return err('Indique a qué cuenta pagó.');
+  if(!t.file) return err('Suba el capture.');
+  if(Math.abs(t.monto/precioEn(t.fecha)-R.valor)>0.001) return err('Con esa fecha, el monto debe ser '+bs(Math.round(R.valor*precioEn(t.fecha)*100)/100)+' Bs.');
+  cargando('Enviando…');
+  try{
+    var s=SUBIDOS[0];
+    if(!s || s.file!==t.file){ var cap=await reducir(t.file,1200,1600,0.8).catch(function(){ throw 'No se pudo leer la imagen del capture. Use una foto JPG o una captura de pantalla.'; });
+      s=SUBIDOS[0]={file:t.file, id:(await srv('subirCapture', PARAMS.e, PARAMS.k, cap.url, t.referencia)).id}; }
+    var r=await srv('reemplazarTransferencia', PARAMS.e, PARAMS.k, R.id, {monto:t.monto, fecha:t.fecha, referencia:t.referencia, banco:t.banco, cuenta:t.cuenta, captureId:s.id});
+    ESTADO.vista='inicio'; ESTADO.reemplazo=null; SUBIDOS={}; refrescar(r); cerrarVelo(); window.scrollTo(0,0);
   }catch(e){ cerrarVelo(); err(e); }
 }
 
