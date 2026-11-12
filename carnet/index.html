@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carnetización docente Táchira</title>
+<meta name="robots" content="noindex">
+<style>
+:root{--navy:#0e2d5c;--purple:#583aa0;--pink:#c2457e;--bg:#f4f2fa;--card:#fff;--line:#e3dff0;--txt:#1d1b2a;--muted:#6b6880;
+--ok:#1f7a45;--okbg:#e4f4ea;--warn:#8a5a00;--warnbg:#fdf1d8;--bad:#a12b2b;--badbg:#fbe6e6;--r:14px}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:linear-gradient(120deg,var(--navy),var(--purple) 70%,var(--pink));color:#fff;padding:18px 16px 22px;border-radius:0 0 22px 22px}
+header .k{font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.8}header h1{margin:4px 0 2px;font-size:21px;line-height:1.25}
+header .s{font-size:14px;opacity:.9}main{max-width:720px;margin:0 auto;padding:14px 14px 260px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin:14px 0}
+.card h2{margin:0 0 6px;font-size:18px;color:var(--navy)}.muted{color:var(--muted);font-size:14px}
+.chip{display:inline-block;font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px;background:#ece9f6;color:var(--purple)}
+.chip.ok{background:var(--okbg);color:var(--ok)}.chip.warn{background:var(--warnbg);color:var(--warn)}.chip.bad{background:var(--badbg);color:var(--bad)}
+button,.btn{font:inherit;font-weight:600;border:0;border-radius:12px;padding:12px 16px;cursor:pointer;background:var(--navy);color:#fff;min-height:46px}
+button.sec{background:#ece9f6;color:var(--navy)}button.peligro{background:var(--badbg);color:var(--bad)}button.ok{background:var(--ok)}
+button:disabled{opacity:.45;cursor:not-allowed}.fila{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.full{width:100%}
+label{display:block;font-size:14px;font-weight:600;margin:12px 0 4px;color:var(--navy)}
+#fNom,#fApe,#fOtro{text-transform:uppercase}
+input,select,textarea{font:inherit;width:100%;padding:11px 12px;border:1px solid #cfc9e3;border-radius:10px;background:#fff;color:var(--txt)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--purple);border-color:transparent}
+.err{background:var(--badbg);color:var(--bad);border-radius:10px;padding:10px 12px;margin:10px 0;font-size:15px}
+.aviso{background:var(--warnbg);color:var(--warn);border-radius:10px;padding:10px 12px;margin:10px 0;font-size:15px}
+.bien{background:var(--okbg);color:var(--ok);border-radius:10px;padding:10px 12px;margin:10px 0;font-size:15px}
+.persona{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.persona:first-child{border-top:0}.persona b{display:block;font-size:15px}.persona small{color:var(--muted)}
+.vista{display:flex;gap:16px;flex-wrap:wrap}.vista .form{flex:1 1 300px;min-width:0}.vista .prev{flex:0 0 260px;margin:0 auto}@media(max-width:620px){.vista .prev{order:-1}.prev canvas{width:210px;margin:0 auto}}
+.prev canvas{width:260px;height:auto;border-radius:10px;box-shadow:0 6px 24px rgba(14,45,92,.18);display:block;background:#eee}
+.prev .t{font-size:13px;color:var(--muted);text-align:center;margin-top:6px}
+.velo{position:fixed;inset:0;background:rgba(14,20,40,.45);display:flex;align-items:flex-start;justify-content:center;z-index:9;overflow-y:auto;padding:16px 0 40px;-webkit-overflow-scrolling:touch}
+.velo .card{max-width:420px;width:92%}.oculto{display:none!important}
+.barra{height:8px;background:#e6e2f3;border-radius:9px;overflow:hidden}.barra i{display:block;height:100%;background:linear-gradient(90deg,var(--navy),var(--purple))}
+table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:8px 6px;border-top:1px solid var(--line);text-align:left;vertical-align:top}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}.tabs button{background:#fff;color:var(--navy);border:1px solid var(--line);min-height:40px;padding:8px 12px}
+.tabs button.act{background:var(--navy);color:#fff}
+@media(max-width:620px){.prev canvas{width:210px;margin:0 auto}}
+html,body{overflow-x:hidden}.fila>input{min-width:0;flex:1 1 auto;width:auto}
+</style>
+
+</head><body><header><div class="k">Carnetización docente · Táchira</div><h1 id="hNom">Cargando…</h1><div class="s" id="hSub"></div></header>
+<main id="app"><div class="card"><div class="muted">Abriendo su escuela…</div><div class="barra" style="margin-top:10px"><i style="width:40%"></i></div></div></main>
+
+<div id="velo" class="velo oculto"><div class="card" id="veloC"></div></div>
+
+<script src="qr.js?v=1"></script>
+<script src="render.js?v=1"></script>
+<script>
+var API = 'https://script.google.com/macros/s/AKfycbymxmjlvceY5IaQkz28MOsvxwk7TNmNXQ5cKL92t6aA1-eiSxvRmFMFy54w_70ALltTzg/exec';
+var PARAMS = (function(){ var q=new URLSearchParams(location.search); return { e:q.get('e')||'', k:q.get('k')||'' }; })();
+var D = null, BG = {}, ESTADO = { vista: 'inicio' };
+var AREAS = ['CULTURA','DEPORTE','TEATRO','DANZA','MÚSICA','ARTES PLÁSTICAS','LABORATORIO','COMPUTACIÓN','IDIOMAS','PTMS','EDUCACIÓN FÍSICA'];
+
+function $(id){return document.getElementById(id);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function bs(n){return Number(n).toLocaleString('es-VE');}
+async function srv(fn){
+  var a=[].slice.call(arguments,1), r, x;
+  var veces = (fn==='inicio'||fn==='fotoPersona') ? 2 : 1;   // solo se reintenta lo que no guarda nada
+  for (var intento=0; intento<veces; intento++){
+    try{ r = await fetch(API, {method:'POST', body: JSON.stringify({fn:fn, args:a}), headers:{'Content-Type':'text/plain;charset=utf-8'}}); x = await r.json(); break; }
+    catch(e){ if (intento===veces-1) throw (fn==='inicio'||fn==='fotoPersona') ? 'No hay conexión con el sistema. Revise su internet e intente de nuevo.' : 'Se cortó la conexión. Antes de repetir, recargue la página y revise si ya quedó guardado.'; await new Promise(function(ok){setTimeout(ok,1500);}); }
+  }
+  if (!x || !x.ok) throw (x && x.error) || 'El sistema no respondió. Intente de nuevo.';
+  return x.data;
+}
+function montoVE(t){var s=String(t==null?'':t).replace(/[^\d,.-]/g,''),c=s.lastIndexOf(','),d=s.lastIndexOf('.');if(c>d&&!(d<0&&s.length-c-1===3))s=s.replace(/\./g,'').replace(',','.');else if(d>c&&s.length-d-1!==3)s=s.replace(/,/g,'');else s=s.replace(/[.,]/g,'');return Number(s);}
+function img(src){return new Promise(function(ok,ko){var i=new Image();i.onload=function(){ok(i)};i.onerror=ko;i.src=src;});}
+function velo(html){$('veloC').innerHTML=html;$('velo').classList.remove('oculto');}
+function cerrarVelo(){$('velo').classList.add('oculto');}
+function cargando(msg){velo('<h2>'+esc(msg||'Guardando…')+'</h2><div class="barra"><i style="width:70%"></i></div><p class="muted">No cierre esta página.</p>');}
+function aviso(m){velo('<h2>Falta algo</h2><div class="err">'+esc(m)+'</div><button class="full" onclick="cerrarVelo()">Entendido</button>');}
+function fallo(m){velo('<h2>No se pudo</h2><div class="err">'+esc(m)+'</div><button class="full" onclick="cerrarVelo()">Entendido</button>');}
+
+async function arrancar(){
+  if (!PARAMS.e || !PARAMS.k){ $('hNom').textContent='Enlace incompleto'; $('app').innerHTML='<div class="card"><div class="err">Este enlace está incompleto.</div><p class="muted">Abra el enlace completo que le enviaron por WhatsApp, o pida uno nuevo a la coordinación de carnetización.</p></div>'; return; }
+  var letras = CARNET.loadFonts({reg:'assets/Inter-Regular.otf', bold:'assets/Inter-Bold.otf', xbold:'assets/Inter-ExtraBold.otf'});
+  try{
+    D = await srv('inicio', PARAMS.e, PARAMS.k);
+  }catch(e){
+    var malEnlace = /enlace/i.test(String(e));
+    $('hNom').textContent = malEnlace ? 'Enlace no válido' : 'No se pudo abrir';
+    $('app').innerHTML='<div class="card"><div class="err">'+esc(e)+'</div>'+(malEnlace?'<p class="muted">Pida un enlace nuevo a la coordinación de carnetización.</p>':'<button class="full" onclick="location.reload()">Intentar de nuevo</button>')+'</div>';
+    return;
+  }
+  try{
+    var pre = D.escuela.estatal ? 'EST_' : 'NAC_';
+    var fondos = ['DOCENTE','ADMINISTRATIVO','OBRERO'].map(function(g){ return img('assets/'+pre+g+'.png').then(function(i){ BG[g]=i; }); });
+    await Promise.all(fondos.concat([letras]));
+  }catch(e){ $('app').innerHTML='<div class="card"><div class="err">No se pudieron cargar los diseños del carnet. Revise su internet.</div><button class="full" onclick="location.reload()">Intentar de nuevo</button></div>'; return; }
+  pintar();
+}
+function refrescar(d){ if(d && d.escuela){ D=d; } pintar(); }
+
+// ---------------------------------------------------------------- vistas
+function pintar(){
+  $('hNom').textContent = D.escuela.oficial;
+  $('hSub').textContent = 'Municipio ' + D.escuela.municipio + ' · Código ' + D.escuela.codigo;
+  if (ESTADO.vista === 'persona' || ESTADO.vista === 'pago') return;
+  var h = '';
+  var corr = D.lotes.filter(function(l){return l.tipo==='CORRECCION' && l.estado==='ABIERTO';});
+  corr.forEach(function(l){ h += tarjetaCorreccion(l); });
+  h += '<div class="card"><h2>Carnets nuevos</h2><p class="muted">Cada pago abre los cupos exactos. Precio: <b>'+bs(D.precio)+' Bs por carnet</b>.'+reglaPrecio()+' ' +
+       'Pague solo cuando tenga los datos y la foto de <b>todas</b> las personas del grupo.</p>' +
+       '<button class="full" onclick="formPago()">Registrar un pago nuevo</button></div>';
+  D.lotes.filter(function(l){return l.tipo!=='CORRECCION';}).reverse().forEach(function(l){ h += tarjetaLote(l); });
+  $('app').innerHTML = h;
+}
+
+function chipLote(l){
+  var m={'PAGO EN ESPERA':'warn','ABIERTO':'','TERMINADO':'ok','PDF GENERADO':'ok','IMPRESO':'ok','PAGO RECHAZADO':'bad'};
+  var t={'PAGO EN ESPERA':'Pago en espera','ABIERTO':'Pago confirmado','TERMINADO':'Enviado a revisión','PDF GENERADO':'En revisión','IMPRESO':'Impreso','PAGO RECHAZADO':'Pago rechazado'};
+  return '<span class="chip '+(m[l.estado]||'')+'">'+(t[l.estado]||l.estado)+'</span>';
+}
+function personasDe(lote){ return D.personas.filter(function(p){return p.lote===lote;}); }
+
+function tarjetaLote(l){
+  var ps = personasDe(l.lote), abierto = ['PAGO EN ESPERA','ABIERTO'].indexOf(l.estado)>=0;
+  var h = '<div class="card"><div class="fila" style="justify-content:space-between"><h2>Grupo de '+l.cupos+' carnet'+(l.cupos>1?'s':'')+'</h2>'+chipLote(l)+'</div>';
+  var et={'EN ESPERA':'<span class="chip warn">en espera</span>','CONFIRMADO':'<span class="chip ok">confirmado</span>','RECHAZADO':'<span class="chip bad">rechazado</span>','ANULADO':'<span class="chip">anulado</span>'};
+  (l.pagos||[]).forEach(function(t){
+    h += '<div class="muted">Transferencia ref. …'+esc(String(t.ref).slice(-6))+' · '+bs(t.monto)+' Bs'+(t.fecha?' · '+esc(t.fecha):'')+' '+(l.pagos.length>1?(et[t.estado]||''):'')+'</div>';
+  });
+  if (l.estado==='PAGO EN ESPERA') h += '<div class="aviso">El pago se confirma cuando la coordinación carga el estado de cuenta (todos los días después de la 1:00 p. m.'+(D.ultimaCarga?'; última carga: '+esc(D.ultimaCarga):'')+'). Mientras tanto ya puede cargar a su personal.</div>';
+  if (l.estado==='PAGO RECHAZADO') { var rj=(l.pagos||[]).filter(function(t){return t.estado==='RECHAZADO';})[0]; h += '<div class="err">La coordinación no encontró este pago'+(rj?' (ref. …'+esc(String(rj.ref).slice(-6))+')':'')+'. '+esc(rj&&rj.nota||'')+' Registre el pago de nuevo con los datos correctos.</div>'; }
+  h += '<div class="barra" style="margin:10px 0"><i style="width:'+Math.round(100*ps.length/l.cupos)+'%"></i></div><div class="muted">'+ps.length+' de '+l.cupos+' cargados</div>';
+  ps.forEach(function(p){
+    var est = p.estado==='POR APROBAR' ? '<span class="chip warn">Esperando aprobación</span>' : '';
+    h += '<div class="persona"><div><b>'+esc(p.nombres+' '+p.apellidos)+'</b><small>'+esc(p.nac+'-'+p.cedula+' · '+p.cargo)+'</small> '+est+'</div>' +
+         (abierto ? '<div class="fila"><button class="sec" onclick="editar('+p.fila+')">Ver / editar</button></div>' : '<button class="sec" onclick="verCarnet('+p.fila+')">Ver</button>') + '</div>';
+  });
+  if (abierto && ps.length < l.cupos) h += '<button class="full" style="margin-top:10px" onclick="nueva(\''+l.lote+'\')">+ Agregar persona ('+(l.cupos-ps.length)+' cupo'+(l.cupos-ps.length>1?'s':'')+' libre'+(l.cupos-ps.length>1?'s':'')+')</button>';
+  if (abierto) {
+    var listo = l.estado==='ABIERTO' && ps.length===l.cupos && !ps.some(function(p){return p.estado==='POR APROBAR';});
+    h += '<button class="full ok" style="margin-top:10px" '+(listo?'':'disabled')+' onclick="terminar(\''+l.lote+'\')">Terminar y enviar a la coordinación</button>';
+    if (!listo) h += '<p class="muted" style="margin:6px 0 0">Se activa cuando el pago esté confirmado, estén cargados los '+l.cupos+' y no haya nada esperando aprobación.</p>';
+  }
+  return h + '</div>';
+}
+
+function tarjetaCorreccion(l){
+  var ps = personasDe(l.lote), falta = ps.filter(function(p){return p.estado==='CORREGIR';}).length;
+  var h = '<div class="card" style="border:2px solid #f0c36a"><div class="fila" style="justify-content:space-between"><h2>Correcciones pendientes</h2><span class="chip warn">'+falta+' por corregir</span></div>' +
+          '<p class="muted">Estos carnets no se pudieron imprimir por los errores indicados. Corrija cada uno, revise el carnet y guárdelo. Las correcciones no se cobran.</p>';
+  ps.forEach(function(p){
+    var listo = p.estado==='CORREGIDO';
+    h += '<div class="persona"><div><b>'+esc(p.nombres+' '+p.apellidos)+'</b><small>'+esc(p.nac+'-'+p.cedula)+'</small>' +
+         '<div class="'+(listo?'bien':'aviso')+'" style="margin:6px 0 0;padding:6px 10px">'+(listo?'Corregido ✓':esc(p.problema||'Revisar datos'))+'</div></div>' +
+         '<button class="'+(listo?'sec':'')+'" onclick="editar('+p.fila+')">'+(listo?'Ver':'Corregir')+'</button></div>';
+  });
+  h += '<button class="full ok" style="margin-top:12px" '+(falta?'disabled':'')+' onclick="terminar(\''+l.lote+'\')">Terminar correcciones y enviar</button>';
+  return h + '</div>';
+}
+
+// ---------------------------------------------------------------- pago
+function reglaPrecio(){
+  var P=D.precios||{}; if(!P.desde || P.base===P.nuevo) return '';
+  return ' Las transferencias hechas hasta el <b>'+fechaVE(diaAntes(P.desde))+'</b> valen <b>'+bs(P.base)+' Bs</b> por carnet; desde el <b>'+fechaVE(P.desde)+'</b>, <b>'+bs(P.nuevo)+' Bs</b>.';
+}
+function fechaVE(iso){ var m=String(iso||'').split('-'); return m.length===3? m[2]+'/'+m[1]+'/'+m[0] : String(iso||''); }
+function diaAntes(iso){ var p=iso.split('-'), d=new Date(+p[0],+p[1]-1,+p[2]-1); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
+function precioEn(iso){ var P=D.precios||{base:D.precio}; return (P.desde && iso && iso>=P.desde) ? P.nuevo : P.base; }
+
+var MAXT = 6, BANCOS = ['Banco de Venezuela','Banesco','Mercantil','Provincial (BBVA)','Bicentenario','Banco del Tesoro','Bancaribe','BNC (Nacional de Crédito)','Exterior','Banco Plaza','Venezolano de Crédito','Sofitasa','Banco Activo','Bancamiga','100% Banco','Banplus','Fondo Común (BFC)','Banco Caroní','Banco Agrícola','Del Sur','Otro'];
+function formPago(){
+  var c = D.cuentas.length ? '<div class="muted" style="white-space:pre-line;margin-bottom:6px">'+esc(D.cuentas.join('\n\n'))+'</div>' : '';
+  ESTADO.vista='pago'; window.scrollTo(0,0);
+  var bloques='';
+  for (var i=0;i<MAXT;i++){
+    bloques += '<div class="card'+(i?' oculto':'')+'" id="tB'+i+'" style="margin:12px 0;background:#faf9fe">'+
+     '<h2 style="font-size:16px">Transferencia <span class="tN">'+(i+1)+'</span></h2>'+
+     '<label>Monto que transfirió (Bs)</label><input id="tM'+i+'" inputmode="decimal" oninput="resumenPago()">'+
+     '<label>Fecha de la transferencia</label><input id="tF'+i+'" type="date" max="'+esc(D.hoy||'')+'" onchange="resumenPago()" oninput="resumenPago()">'+
+     '<div class="muted" id="tV'+i+'"></div>'+
+     '<label>Número de referencia completo</label><input id="tR'+i+'" inputmode="numeric">'+
+     '<label>Banco desde donde pagó</label><select id="tBa'+i+'"><option value="">— elija —</option>'+BANCOS.map(function(b){return '<option>'+esc(b)+'</option>';}).join('')+'</select>'+
+     '<label>Cuenta a la que pagó</label><select id="tC'+i+'"><option value="">— elija —</option><option value="Virginia">María Virginia Duque</option><option value="Edison">Edison Méndez</option><option value="Rossy">Rossy Daniela Camargo</option></select>'+
+     '<label>Capture de esta transferencia</label><input id="tK'+i+'" type="file" accept="image/*"><div class="muted">Toque la casilla y elija la foto del capture en su galería.</div></div>';
+  }
+  var opc=''; for (var n=1;n<=MAXT;n++) opc+='<option value="'+n+'">'+n+(n===1?' transferencia':' transferencias')+'</option>';
+  $('app').innerHTML=('<div class="card"><div class="fila" style="justify-content:space-between"><h2>Registrar pago</h2><button class="sec" onclick="volver()">← Volver</button></div>'+c+
+   '<p class="muted">Precio: <b>'+bs(D.precio)+' Bs por carnet</b>.'+reglaPrecio()+'</p>'+
+   '<label>¿Cuántos carnets paga?</label><input id="pCant" type="number" min="1" inputmode="numeric" oninput="resumenPago()">'+
+   '<label>¿En cuántas transferencias pagó?</label><select id="pNT" onchange="verBloques()">'+opc+'</select>'+
+   '<div class="muted">Si pagó el total de una vez, deje «1 transferencia». Si pagó por partes, elija cuántas y llene cada una con su capture.</div>'+
+   bloques+
+   '<div id="pRes"></div><div id="pErr"></div><button class="full" style="margin-top:14px" onclick="enviarPago()">Registrar pago</button></div>');
+  resumenPago();
+}
+function nT(){ return +$('pNT').value||1; }
+function verBloques(){ for (var i=0;i<MAXT;i++) $('tB'+i).classList.toggle('oculto', i>=nT()); $('tB0').querySelector('h2').style.display = nT()>1?'':'none'; resumenPago(); }
+function leerTransf(){
+  var T=[]; for (var i=0;i<nT();i++) T.push({ monto:montoVE($('tM'+i).value), fecha:$('tF'+i).value, referencia:$('tR'+i).value, banco:$('tBa'+i).value, cuenta:$('tC'+i).value, file:$('tK'+i).files[0] });
+  return T;
+}
+function resumenPago(){
+  if (!$('pRes')) return;
+  if ($('tB0')) $('tB0').querySelector('h2').style.display = nT()>1?'':'none';
+  var cant=+$('pCant').value||0, T=leerTransf(), valor=0, total=0, completo=true;
+  T.forEach(function(t,i){
+    var p = t.fecha ? precioEn(t.fecha) : 0;
+    $('tV'+i).innerHTML = t.fecha ? 'Para esta fecha: '+bs(p)+' Bs por carnet' : '';
+    if (!(t.monto>0) || !t.fecha) { completo=false; return; }
+    total += t.monto; valor += t.monto/p;
+  });
+  var v = Math.round(valor*100)/100, h='';
+  if (!cant) h = '';
+  else if (!completo) h = '<div class="aviso">Llene el monto y la fecha de cada transferencia para ver si cuadra con '+cant+' carnet(s).</div>';
+  else if (Math.abs(valor-cant)<=0.001) h = '<div class="bien">Cuadra: '+bs(total)+' Bs = '+cant+' carnet(s). ✓</div>';
+  else h = '<div class="err">No cuadra: lo transferido ('+bs(total)+' Bs) alcanza para '+v.toLocaleString('es-VE')+' carnet(s) y usted indicó '+cant+'.</div>';
+  $('pRes').innerHTML = h;
+}
+async function enviarPago(){
+  var cant=+$('pCant').value, T=leerTransf();
+  var err=function(m){$('pErr').innerHTML='<div class="err">'+esc(m)+'</div>'; aviso(m);};
+  if(!cant || cant<1 || cant!==Math.floor(cant)) return err('Indique cuántos carnets paga.');
+  var valor=0, refs={};
+  for (var i=0;i<T.length;i++){
+    var t=T[i], n = T.length>1 ? ' (transferencia '+(i+1)+')' : '';
+    if(!(t.monto>0)) return err('Escriba el monto'+n+'.');
+    if(!t.fecha) return err('Indique la fecha'+n+'.');
+    if(D.hoy && t.fecha>D.hoy) return err('La fecha'+n+' no puede ser futura.');
+    var r=String(t.referencia).replace(/\D/g,''); if(r.length<6) return err('Escriba la referencia completa'+n+'.');
+    if(refs[r.slice(-6)]) return err('La referencia'+n+' está repetida.'); refs[r.slice(-6)]=1;
+    if(!t.banco) return err('Elija el banco desde donde pagó'+n+'.');
+    if(!t.cuenta) return err('Indique a qué cuenta pagó'+n+'.');
+    if(!t.file) return err('Suba el capture'+n+'.');
+    valor += t.monto/precioEn(t.fecha);
+  }
+  if (Math.abs(valor-cant)>0.001) return err('Lo transferido alcanza para '+(Math.round(valor*100)/100).toLocaleString('es-VE')+' carnet(s) y usted indicó '+cant+'. Revise los montos y las fechas.'+(reglaPrecio()?' Recuerde: '+reglaPrecio().replace(/<[^>]+>/g,''):''));
+  cargando('Registrando pago…');
+  try{
+    var datos={cantidad:cant, transferencias:[]};
+    for (var j=0;j<T.length;j++){
+      var cap = await reducir(T[j].file, 1400, 1400, 0.85).catch(function(){ throw 'No se pudo leer la imagen del capture'+(T.length>1?' de la transferencia '+(j+1):'')+'. Use una foto JPG o una captura de pantalla.'; });
+      datos.transferencias.push({monto:T[j].monto, fecha:T[j].fecha, referencia:T[j].referencia, banco:T[j].banco, cuenta:T[j].cuenta, capture:cap.url});
+    }
+    var r = await srv('registrarPago', PARAMS.e, PARAMS.k, datos); ESTADO.vista='inicio'; refrescar(r); cerrarVelo(); window.scrollTo(0,0);
+  }catch(e){ cerrarVelo(); err(e); }
+}
+
+// ---------------------------------------------------------------- fotos
+async function leerImg(file){ var url=URL.createObjectURL(file); var i=await img(url); return i; }
+async function reducir(file, mw, mh, q){
+  var i = await leerImg(file), w=i.naturalWidth, h=i.naturalHeight, k=Math.min(1, mw/w, mh/h);
+  var c=document.createElement('canvas'); c.width=Math.round(w*k); c.height=Math.round(h*k);
+  c.getContext('2d').drawImage(i,0,0,c.width,c.height);
+  return { url:c.toDataURL('image/jpeg', q), w:w, h:h, img:i };
+}
+function revisarFoto(r){
+  var prob=[];
+  if (r.w < 400 || r.h < 480) prob.push('La foto es muy pequeña ('+r.w+'×'+r.h+' píxeles). Se verá borrosa en el carnet. Tome una foto nueva con la cámara del teléfono, no una captura de pantalla.');
+  var c=document.createElement('canvas'); c.width=40; c.height=50; var x=c.getContext('2d'); x.drawImage(r.img,0,0,40,50);
+  var d=x.getImageData(0,0,40,50).data, s=0; for(var i=0;i<d.length;i+=4) s+=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+  if (s/(d.length/4) < 70) prob.push('La foto está muy oscura. Tómela con buena luz, de frente, en una pared clara.');
+  if (r.h < r.w) prob.push('La foto está acostada o es horizontal. Debe ser vertical, de pecho hacia arriba.');
+  return prob;
+}
+
+// ---------------------------------------------------------------- formulario de persona
+var P = null;   // persona en edición
+function nueva(lote){ P={lote:lote, nac:'V', tipo:'', genero:'', cargo:'', area:'', atipico:false, motivo:'', cargoOtro:false}; abrirForm(); }
+async function editar(fila){
+  var p = D.personas.filter(function(x){return x.fila===fila;})[0]; if(!p) return;
+  P = JSON.parse(JSON.stringify(p)); P.fotoId = p.foto; P.cargoBase=''; P.atipico=!!p.motivo; P.cargoOtro=false;
+  var cg = D.cargos.filter(function(c){return c.m===p.cargo||c.f===p.cargo;})[0];
+  var ca = D.cargos.filter(function(c){ return c.area && (p.cargo.indexOf(c.m+' DE ')===0 || p.cargo.indexOf(c.f+' DE ')===0); })[0];
+  if (cg) { P.cargoBase=cg.m; if (!P.atipico && cg.tipo!==p.tipo && !D.cargos.some(function(c){return c.m===cg.m && c.tipo===p.tipo;})) P.cargoBase=''; }
+  else if (ca) { P.cargoBase=ca.m; P.area=p.cargo.slice(p.cargo.indexOf(' DE ', ca.m.length-1)+4); }
+  else { P.cargoOtro=true; P.cargoTexto=p.cargo; }
+  abrirForm();
+  if (p.foto) { try{ P.fotoImg = await img(await srv('fotoPersona', PARAMS.e, PARAMS.k, p.foto)); vistaPrevia(); }catch(e){} }
+}
+function verCarnet(fila){ editar(fila).then(function(){ document.querySelectorAll('#fForm input,#fForm select,#fForm textarea,#fForm button').forEach(function(x){x.disabled=true;}); $('bGuardar').classList.add('oculto'); }); }
+
+function opcionesCargo(){
+  var lista = D.cargos.filter(function(c){ return P.atipico || c.tipo===P.tipo; });
+  var vistos={}, h='<option value="">— elija el cargo —</option>';
+  lista.forEach(function(c){ if(vistos[c.m]) return; vistos[c.m]=1; var t = P.genero==='F'?c.f:c.m; h+='<option value="'+esc(c.m)+'"'+(P.cargoBase===c.m?' selected':'')+'>'+esc(t)+'</option>'; });
+  return h + '<option value="__OTRO"'+(P.cargoOtro?' selected':'')+'>Otro cargo que no está en la lista…</option>';
+}
+
+function abrirForm(){
+  ESTADO.vista='persona';
+  var corr = P.problema ? '<div class="aviso"><b>Lo que hay que corregir:</b> '+esc(P.problema)+'</div>' : '';
+  $('app').innerHTML = '<div class="card"><div class="fila" style="justify-content:space-between"><h2>'+(P.fila?'Datos de la persona':'Agregar persona')+'</h2><button class="sec" onclick="volver()">← Volver</button></div>'+corr+
+  '<div class="vista"><div class="form" id="fForm">'+'<div class="muted">Llene todo y pulse <b>Guardar</b> (abajo).</div>'+
+  '<label>Cédula</label><div class="fila" style="flex-wrap:nowrap"><select id="fNac" style="width:80px"><option>V</option><option>E</option></select><input id="fCed" inputmode="numeric" enterkeyhint="done" placeholder="Solo números" value="'+esc(P.cedula||'')+'"></div>'+
+  '<label>Nombres (completos, sin iniciales)</label><input id="fNom" enterkeyhint="done" value="'+esc(P.nombres||'')+'" autocapitalize="characters">'+
+  '<label>Apellidos (completos)</label><input id="fApe" enterkeyhint="done" value="'+esc(P.apellidos||'')+'" autocapitalize="characters">'+
+  '<label>Es</label><select id="fGen"><option value="">— elija —</option><option value="F">Mujer</option><option value="M">Hombre</option></select>'+
+  '<label>Tipo de personal</label><select id="fTipo"><option value="">— elija —</option><option>PERSONAL DOCENTE</option><option>PERSONAL ADMINISTRATIVO</option><option>PERSONAL OBRERO</option></select>'+
+  '<label style="font-weight:500"><input type="checkbox" id="fAtip" style="width:auto"> Caso especial: su cargo es de otro tipo de personal (por ejemplo, administrativo u obrero que da clases)</label>'+
+  '<div id="fMotW" class="oculto"><label>Explique el caso</label><textarea id="fMot" rows="2" placeholder="Ej.: ex docente de CENIFA, cumple función de aula">'+esc(P.motivo||'')+'</textarea></div>'+
+  '<label>Cargo</label><select id="fCargo"></select>'+
+  '<div id="fAreaW" class="oculto"><label>Área del especialista</label><select id="fArea"><option value="">— elija —</option>'+AREAS.map(function(a){return '<option'+(P.area===a?' selected':'')+'>'+a+'</option>';}).join('')+'</select></div>'+
+  '<div id="fOtroW" class="oculto"><label>Escriba el cargo</label><input id="fOtro" value="'+esc(P.cargoTexto||'')+'" autocapitalize="characters"><div class="muted">Un cargo nuevo lo revisa la coordinación antes de imprimir.</div></div>'+
+  '<label>Foto</label><input type="file" id="fFoto" accept="image/*"><div class="muted">De frente, en pared clara, de pecho hacia arriba. Nada de capturas de pantalla.</div><div id="fFotoMsg"></div>'+
+  '<div id="fErr"></div><div class="fila" style="margin-top:14px"><button class="sec" onclick="volver()">Cancelar</button><button id="bGuardar" onclick="guardar()">Guardar</button></div>'+
+  '</div><div class="prev"><canvas id="cv"></canvas><div class="t">Así quedará el carnet. Revise cada letra.</div></div></div></div>';
+  $('fNac').value=P.nac||'V'; $('fGen').value=P.genero||''; $('fTipo').value=P.tipo||''; $('fAtip').checked=!!P.atipico;
+  $('fCargo').innerHTML=opcionesCargo(); visibles();
+  ['fNac','fCed','fNom','fApe','fGen','fTipo','fCargo','fArea','fOtro','fMot','fAtip'].forEach(function(id){
+    $(id).addEventListener('input', leer); $(id).addEventListener('change', leer); });
+  $('fFoto').addEventListener('change', nuevaFoto);
+  ['fCed','fNom','fApe','fOtro'].forEach(function(id){ $(id).addEventListener('keydown', function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); this.blur(); } }); });
+  window.scrollTo(0,0); vistaPrevia();
+}
+function visibles(){
+  $('fMotW').classList.toggle('oculto', !P.atipico);
+  $('fAreaW').classList.toggle('oculto', P.cargoBase!=='DOCENTE ESPECIALISTA');
+  $('fOtroW').classList.toggle('oculto', !P.cargoOtro);
+}
+function leer(ev){
+  P.nac=$('fNac').value; P.cedula=$('fCed').value.replace(/\D/g,''); P.nombres=$('fNom').value.toUpperCase(); P.apellidos=$('fApe').value.toUpperCase();
+  var regen = ev && (ev.target.id==='fGen'||ev.target.id==='fTipo'||ev.target.id==='fAtip');
+  P.genero=$('fGen').value; P.tipo=$('fTipo').value; P.atipico=$('fAtip').checked; P.motivo=$('fMot').value;
+  if (ev && ev.target.id==='fCargo'){ var v=$('fCargo').value; P.cargoOtro = v==='__OTRO'; P.cargoBase = P.cargoOtro?'':v; }
+  if (regen) { if (!P.atipico && P.cargoBase && !D.cargos.some(function(c){return c.m===P.cargoBase && c.tipo===P.tipo;})) P.cargoBase=''; $('fCargo').innerHTML=opcionesCargo(); }
+  P.area=$('fArea').value; P.cargoTexto=$('fOtro').value.toUpperCase();
+  visibles(); clearTimeout(leer.t); leer.t=setTimeout(vistaPrevia, 150);
+}
+function cargoFinal(){
+  if (P.cargoOtro) return (P.cargoTexto||'').trim();
+  var c = D.cargos.filter(function(x){return x.m===P.cargoBase;})[0]; if(!c) return '';
+  var t = P.genero==='F'?c.f:c.m;
+  if (c.area) { if (!P.area) return ''; t = t + ' DE ' + P.area; }
+  return t;
+}
+async function nuevaFoto(){
+  var f=$('fFoto').files[0]; if(!f) return;
+  try{ var r = await reducir(f, 1000, 1250, 0.9); }catch(e){ $('fFotoMsg').innerHTML='<div class="err">No se pudo leer esa imagen. Use una foto JPG tomada con la cámara.</div>'; return; }
+  var prob = revisarFoto(r);
+  P.fotoData = r.url; P.fotoId=''; P.fotoImg = await img(r.url); P.excepcionFoto='';
+  if (prob.length) {
+    $('fFotoMsg').innerHTML='<div class="err">'+prob.map(esc).join('<br>')+'</div><button class="sec" onclick="pedirExcepcion()">Es la única foto que hay: pedir excepción a la coordinación</button>';
+    P.fotoRechazo = prob.join(' ');
+  } else { $('fFotoMsg').innerHTML='<div class="bien">Foto aceptada.</div>'; P.fotoRechazo=''; }
+  vistaPrevia();
+}
+function pedirExcepcion(){ P.excepcionFoto = P.fotoRechazo; P.fotoRechazo=''; $('fFotoMsg').innerHTML='<div class="aviso">Se enviará a la coordinación para aprobar. Este carnet no se imprime hasta que la aprueben.</div>'; }
+
+function vistaPrevia(){
+  var cv=$('cv'); if(!cv) return;
+  var nom=(P.nombres||'').trim().replace(/\s+/g,' '), ape=(P.apellidos||'').trim().replace(/\s+/g,' ');
+  var tipo=P.tipo||'PERSONAL DOCENTE';
+  var p={nombres:nom||'NOMBRES', apellidos:ape||'APELLIDOS', nombre:((nom||'NOMBRES')+' '+(ape||'APELLIDOS')), ci:(P.nac||'V')+'-'+(P.cedula||'00000000'), tipo:tipo, cargo:cargoFinal()||'CARGO'};
+  CARNET.render(cv, BG[CARNET.grupo(tipo)], p, {corto:D.escuela.corto, oficial:D.escuela.oficial, periodo:D.periodo}, P.fotoImg||null);
+}
+
+async function guardar(){
+  leer();
+  var err=function(m){$('fErr').innerHTML='<div class="err">'+esc(m)+'</div>'; aviso(m);};
+  if (P.fotoRechazo) return err('La foto no sirve. Suba otra o pida una excepción a la coordinación.');
+  if (!P.fotoData && !P.fotoId) return err('Falta la foto.');
+  var cargo=cargoFinal(); if(!cargo) return err(P.cargoBase==='DOCENTE ESPECIALISTA'?'Elija el área del especialista.':'Elija el cargo.');
+  var d={fila:P.fila||'', lote:P.lote, nac:P.nac, cedula:P.cedula, nombres:P.nombres, apellidos:P.apellidos, genero:P.genero, tipo:P.tipo,
+         cargo:cargo, area:P.area||'', atipico:P.atipico, motivo:P.motivo, cargoOtro:P.cargoOtro, foto:P.fotoData||'', fotoId:P.fotoData?'':P.fotoId, excepcionFoto:P.excepcionFoto||''};
+  cargando();
+  try{ var r = await srv('guardarPersona', PARAMS.e, PARAMS.k, d); ESTADO.vista='inicio'; refrescar(r); cerrarVelo(); window.scrollTo(0,0); }
+  catch(e){ cerrarVelo(); err(e); }
+}
+function volver(){ ESTADO.vista='inicio'; P=null; pintar(); window.scrollTo(0,0); }
+
+// ---------------------------------------------------------------- terminar
+function terminar(lote){
+  var n = personasDe(lote).length;
+  velo('<h2>Terminar y enviar</h2><p>Se enviarán <b>'+n+' carnet(s)</b> a la coordinación para imprimir. Después de enviar ya no podrá cambiarlos.</p>'+
+   '<label style="font-weight:500"><input type="checkbox" id="tOk" style="width:auto"> Revisé cada carnet: nombres, apellidos, cédulas, cargos y fotos están correctos.</label>'+
+   '<label>Su nombre y apellido</label><input id="tNom"><label>Su cédula</label><input id="tCed" inputmode="numeric">'+
+   '<div id="tErr"></div><div class="fila" style="margin-top:12px"><button class="sec" onclick="cerrarVelo()">Cancelar</button><button class="ok" onclick="confirmarTerminar(\''+lote+'\')">Enviar</button></div>');
+}
+async function confirmarTerminar(lote){
+  if(!$('tOk').checked){ $('tErr').innerHTML='<div class="err">Marque la casilla para confirmar que revisó los carnets.</div>'; return; }
+  var nom=$('tNom').value, ced=$('tCed').value;
+  cargando('Enviando…');
+  try{ refrescar(await srv('terminarLote', PARAMS.e, PARAMS.k, lote, nom, ced)); velo('<h2>Enviado</h2><div class="bien">La coordinación recibió sus carnets. Le avisarán cuando estén impresos.</div><button class="full" onclick="cerrarVelo()">Listo</button>'); }
+  catch(e){ fallo(e); }
+}
+
+arrancar();
+</script>
+</body></html>
