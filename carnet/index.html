@@ -166,7 +166,7 @@ function avisoRechazados(l, queHacer){
 function tarjetaCorreccion(l){
   var ps = personasDe(l.lote), falta = ps.filter(function(p){return p.estado==='CORREGIR';}).length;
   var h = '<div class="card" style="border:2px solid #f0c36a"><div class="fila" style="justify-content:space-between"><h2>Correcciones pendientes</h2><span class="chip warn">'+falta+' por corregir</span></div>' +
-          '<p class="muted">Estos carnets no se pudieron imprimir por los errores indicados. Corrija cada uno, revise el carnet y guárdelo. Las correcciones no se cobran.</p>';
+          '<p class="muted">Estos carnets no se pudieron imprimir por los errores indicados. Corrija cada uno, revise el carnet y guárdelo.</p>';
   ps.forEach(function(p){
     var listo = p.estado==='CORREGIDO';
     h += '<div class="persona"><div><b>'+esc(p.nombres+' '+p.apellidos)+'</b><small>'+esc(p.nac+'-'+p.cedula)+'</small>' +
@@ -352,7 +352,7 @@ async function editar(fila){
   abrirForm();
   if (p.foto) { try{ P.fotoImg = await img(await srv('fotoPersona', PARAMS.e, PARAMS.k, p.foto)); vistaPrevia(); }catch(e){} }
 }
-function verCarnet(fila){ editar(fila).then(function(){ document.querySelectorAll('#fForm input,#fForm select,#fForm textarea,#fForm button').forEach(function(x){x.disabled=true;}); $('bGuardar').classList.add('oculto'); }); }
+function verCarnet(fila){ editar(fila).then(function(){ document.querySelectorAll('#fForm input,#fForm select,#fForm textarea,#fForm button').forEach(function(x){x.disabled=true;}); $('bGuardar').classList.add('oculto'); $('fAviso').classList.add('oculto'); }); }
 
 function opcionesCargo(){
   var lista = D.cargos.filter(function(c){ return P.atipico || c.tipo===P.tipo; });
@@ -382,6 +382,7 @@ function abrirForm(){
     '<li>Fondo claro y liso (una pared blanca), con buena luz y sin sombras en la cara.</li>'+
     '<li>Sin lentes oscuros, sin gorra, sin filtros.</li></ul></div>'+
     '<input type="file" id="fFoto" accept="image/*"><div id="fFotoMsg"></div>'+
+  '<div class="aviso" id="fAviso" style="margin-top:12px"><b>IMPORTANTE:</b> los datos de este carnet (nombres, cédula, cargo y foto) son <b>responsabilidad de quien los carga</b>. La coordinación no puede modificarlos. Revise bien cómo queda el carnet antes de guardar: si se imprime con un error de carga, <b>la reimpresión tendrá costo</b>.</div>'+
   '<div id="fErr"></div><div class="fila" style="margin-top:14px"><button class="sec" onclick="volver()">Cancelar</button><button id="bGuardar" onclick="guardar()">Guardar</button></div>'+
   '</div><div class="prev"><canvas id="cv"></canvas><div class="t">Así quedará el carnet. Revise cada letra.</div></div></div></div>';
   $('fNac').value=P.nac||'V'; $('fGen').value=P.genero||''; $('fTipo').value=P.tipo||''; $('fAtip').checked=!!P.atipico;
