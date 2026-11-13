@@ -105,7 +105,14 @@ function pintar(){
        'Pague solo cuando tenga los datos y la foto de <b>todas</b> las personas del grupo.</p>' +
        '<button class="full" onclick="formPago()">Registrar un pago nuevo</button></div>';
   D.lotes.filter(function(l){return l.tipo!=='CORRECCION';}).reverse().forEach(function(l){ h += tarjetaLote(l); });
+  h += tarjetaContacto();
   $('app').innerHTML = h;
+}
+function tarjetaContacto(){
+  var c = String(D.contacto||'').trim(); if (!c) return '';
+  var tel = (c.match(/0(\d{3})[-\s.]?(\d{7})/) || []), wa = tel.length ? 'https://wa.me/58'+tel[1]+tel[2] : '';
+  return '<div class="card"><h2>¿Dudas o algún error?</h2><p>Comuníquese directamente con la <b>'+esc(c)+'</b>.</p>'+
+    (wa ? '<a class="btn full" style="display:block;text-align:center;text-decoration:none" href="'+wa+'" target="_blank" rel="noopener">Escribir por WhatsApp</a>' : '')+'</div>';
 }
 
 function chipLote(l){

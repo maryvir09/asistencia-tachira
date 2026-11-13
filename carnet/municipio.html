@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carnetización docente Táchira · Municipio</title>
+<meta name="robots" content="noindex">
+<style>
+:root{--navy:#0e2d5c;--purple:#583aa0;--pink:#c2457e;--bg:#f4f2fa;--card:#fff;--line:#e3dff0;--txt:#1d1b2a;--muted:#6b6880;
+--ok:#1f7a45;--okbg:#e4f4ea;--warn:#8a5a00;--warnbg:#fdf1d8;--bad:#a12b2b;--badbg:#fbe6e6;--r:14px}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:linear-gradient(120deg,var(--navy),var(--purple) 70%,var(--pink));color:#fff;padding:18px 16px 22px;border-radius:0 0 22px 22px}
+header .k{font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.8}header h1{margin:4px 0 2px;font-size:21px;line-height:1.25}
+header .s{font-size:14px;opacity:.9}main{max-width:720px;margin:0 auto;padding:14px 14px 260px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin:14px 0}
+.card h2{margin:0 0 6px;font-size:18px;color:var(--navy)}.muted{color:var(--muted);font-size:14px}
+.chip{display:inline-block;font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px;background:#ece9f6;color:var(--purple)}
+.chip.ok{background:var(--okbg);color:var(--ok)}.chip.warn{background:var(--warnbg);color:var(--warn)}.chip.bad{background:var(--badbg);color:var(--bad)}
+button,.btn{font:inherit;font-weight:600;border:0;border-radius:12px;padding:12px 16px;cursor:pointer;background:var(--navy);color:#fff;min-height:46px}
+button.sec{background:#ece9f6;color:var(--navy)}button.peligro{background:var(--badbg);color:var(--bad)}button.ok{background:var(--ok)}
+button:disabled{opacity:.45;cursor:not-allowed}.fila{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.full{width:100%}
+label{display:block;font-size:14px;font-weight:600;margin:12px 0 4px;color:var(--navy)}
+#fNom,#fApe,#fOtro{text-transform:uppercase}
+input,select,textarea{font:inherit;width:100%;padding:11px 12px;border:1px solid #cfc9e3;border-radius:10px;background:#fff;color:var(--txt)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--purple);border-color:transparent}
+.err{background:var(--badbg);color:var(--bad);border-radius:10px;padding:10px 12px;margin:10px 0;font-size:15px}
+.aviso{background:var(--warnbg);color:var(--warn);border-radius:10px;padding:10px 12px;margin:10px 0;font-size:15px}
+.bien{background:var(--okbg);color:var(--ok);border-radius:10px;padding:10px 12px;margin:10px 0;font-size:15px}
+.persona{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.persona:first-child{border-top:0}.persona b{display:block;font-size:15px}.persona small{color:var(--muted)}
+.vista{display:flex;gap:16px;flex-wrap:wrap}.vista .form{flex:1 1 300px;min-width:0}.vista .prev{flex:0 0 260px;margin:0 auto}@media(max-width:620px){.vista .prev{order:-1}.prev canvas{width:210px;margin:0 auto}}
+.prev canvas{width:260px;height:auto;border-radius:10px;box-shadow:0 6px 24px rgba(14,45,92,.18);display:block;background:#eee}
+.prev .t{font-size:13px;color:var(--muted);text-align:center;margin-top:6px}
+.velo{position:fixed;inset:0;background:rgba(14,20,40,.45);display:flex;align-items:flex-start;justify-content:center;z-index:9;overflow-y:auto;padding:16px 0 40px;-webkit-overflow-scrolling:touch}
+.velo .card{max-width:420px;width:92%}.oculto{display:none!important}
+.barra{height:8px;background:#e6e2f3;border-radius:9px;overflow:hidden}.barra i{display:block;height:100%;background:linear-gradient(90deg,var(--navy),var(--purple))}
+table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:8px 6px;border-top:1px solid var(--line);text-align:left;vertical-align:top}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}.tabs button{background:#fff;color:var(--navy);border:1px solid var(--line);min-height:40px;padding:8px 12px}
+.tabs button.act{background:var(--navy);color:#fff}
+@media(max-width:620px){.prev canvas{width:210px;margin:0 auto}}
+html,body{overflow-x:hidden}.fila>input{min-width:0;flex:1 1 auto;width:auto}
+</style>
+<style>
+.esc{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:12px 0;border-top:1px solid var(--line);cursor:pointer}
+.esc:first-child{border-top:0}.esc b{display:block;font-size:15px;line-height:1.3}.esc small{color:var(--muted)}
+.esc:hover b{color:var(--purple)}#buscar{font-size:17px}
+</style>
+</head><body><header><div class="k">Carnetización docente · Táchira</div><h1 id="hNom">Cargando…</h1><div class="s" id="hSub"></div></header>
+<main id="app"><div class="card"><div class="muted">Abriendo la lista de escuelas…</div><div class="barra" style="margin-top:10px"><i style="width:40%"></i></div></div></main>
+<div id="velo" class="velo oculto"><div class="card" id="veloC"></div></div>
+<script>
+var API = 'https://script.google.com/macros/s/AKfycbymxmjlvceY5IaQkz28MOsvxwk7TNmNXQ5cKL92t6aA1-eiSxvRmFMFy54w_70ALltTzg/exec';
+var P = (function(){ var q=new URLSearchParams(location.search); return { m:(q.get('m')||'').toUpperCase(), k:q.get('k')||'' }; })();
+var L = null, FILTRO = '';
+var TIPOS = ['NACIONAL','ESTADAL','MUNICIPAL','SUBVENCIONADA','PRIVADA','AUTÓNOMA'];
+function $(id){return document.getElementById(id);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function sinTildes(s){return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase();}
+async function srv(fn){
+  var a=[].slice.call(arguments,1), r, x, veces = fn==='municipioLista' ? 2 : 1;
+  for (var i=0;i<veces;i++){
+    try{ r = await fetch(API,{method:'POST',body:JSON.stringify({fn:fn,args:a}),headers:{'Content-Type':'text/plain;charset=utf-8'}}); x = await r.json(); break; }
+    catch(e){ if (i===veces-1) throw 'No hay conexión con el sistema. Revise su internet e intente de nuevo.'; }
+  }
+  if (!x || !x.ok) throw (x && x.error) || 'El sistema no respondió. Intente de nuevo.';
+  return x.data;
+}
+function velo(h){$('veloC').innerHTML=h;$('velo').classList.remove('oculto');}
+function cerrarVelo(){$('velo').classList.add('oculto');}
+function cargando(m){velo('<h2>'+esc(m||'Un momento…')+'</h2><div class="barra"><i style="width:70%"></i></div><p class="muted">No cierre esta página.</p>');}
+function error(m){var e=$('vErr'); if(e){e.textContent=m;e.classList.remove('oculto');} else velo('<h2>No se pudo</h2><div class="err">'+esc(m)+'</div><button class="full" onclick="cerrarVelo()">Entendido</button>');}
+function opcionesTipo(sel){return '<option value="">— elija —</option>'+TIPOS.map(function(t){return '<option'+(t===sel?' selected':'')+'>'+t+'</option>';}).join('');}
+
+async function arrancar(){
+  if (!P.m || !P.k){ $('hNom').textContent='Enlace incompleto'; $('app').innerHTML='<div class="card"><div class="err">Este enlace está incompleto. Pídalo de nuevo a su jefe de centro.</div></div>'; return; }
+  try{ L = await srv('municipioLista', P.m, P.k); }
+  catch(e){ $('hNom').textContent='No se pudo abrir'; $('app').innerHTML='<div class="card"><div class="err">'+esc(e)+'</div><button class="full" onclick="location.reload()">Intentar de nuevo</button></div>'; return; }
+  if (L.tipos && L.tipos.length) TIPOS = L.tipos;
+  $('hNom').textContent = 'Municipio '+L.municipio; $('hSub').textContent = L.escuelas.length+' instituciones';
+  pintar();
+}
+function pintar(){
+  $('app').innerHTML = '<div class="card"><h2>Busque su institución</h2><p class="muted">Escriba parte del nombre. Toque su institución para entrar.</p>'+
+    '<input id="buscar" placeholder="Ej.: Simón Bolívar" autocomplete="off" value="'+esc(FILTRO)+'" oninput="FILTRO=this.value;lista()"><div id="lista" style="margin-top:8px"></div></div>'+
+    '<div class="card"><h2>¿No aparece su institución?</h2><p class="muted">Regístrela usted mismo. Solo si de verdad no está en la lista.</p><button class="sec full" onclick="formNueva()">Mi institución no aparece</button></div>'+
+    contacto();
+  lista();
+}
+function contacto(){
+  var c = String(L.contacto||'').trim(); if (!c) return '';
+  var tel = (c.match(/0(\d{3})[-\s.]?(\d{7})/) || []), wa = tel.length ? 'https://wa.me/58'+tel[1]+tel[2] : '';
+  return '<div class="card"><h2>¿Dudas o algún error?</h2><p>Comuníquese directamente con la <b>'+esc(c)+'</b>.</p>'+
+    (wa ? '<a class="btn full" style="display:block;text-align:center;text-decoration:none" href="'+wa+'" target="_blank" rel="noopener">Escribir por WhatsApp</a>' : '')+'</div>';
+}
+function lista(){
+  var f = sinTildes(FILTRO).trim().split(/\s+/).filter(Boolean);
+  var v = L.escuelas.filter(function(e){ var t=sinTildes(e.n+' '+e.o+' '+e.c); return f.every(function(p){return t.indexOf(p)>=0;}); });
+  var max = 60, h = v.slice(0,max).map(function(e){
+    return '<div class="esc" data-c="'+esc(e.c)+'" onclick="abrir(this.dataset.c)"><div><b>'+esc(e.o)+'</b><small>'+esc(e.c)+(e.t?' · '+esc(e.t):'')+'</small></div>'+
+      '<span class="chip'+(e.pin?' ok':e.propio?' warn':'')+'">'+(e.pin?'Con PIN':e.propio?'Enlace propio':'Primera vez')+'</span></div>';
+  }).join('');
+  if (!v.length) h = '<div class="aviso">No se encontró ninguna institución con ese nombre. Pruebe con otra palabra, o toque «Mi institución no aparece».</div>';
+  else if (v.length>max) h += '<p class="muted">Hay '+(v.length-max)+' más. Escriba más letras del nombre.</p>';
+  $('lista').innerHTML = h;
+}
+function escuela(c){ return L.escuelas.filter(function(e){return e.c===c;})[0]; }
+var ACT = '';
+function abrir(c){
+  var e = escuela(c); ACT = c;
+  if (e.propio && !e.pin){
+    velo('<h2>'+esc(e.o)+'</h2><div class="aviso">Esta institución ya tiene su propio enlace de carnetización. Use ese enlace. Si no lo tiene, pídalo a la coordinación de carnetización.</div><button class="full" onclick="cerrarVelo()">Entendido</button>');
+    return;
+  }
+  if (e.pin){
+    velo('<h2>'+esc(e.o)+'</h2><p class="muted">Escriba el PIN de 4 números de esta institución.</p>'+
+      '<label>PIN</label><input id="vPin" type="password" inputmode="numeric" maxlength="4" autocomplete="off">'+
+      '<div id="vErr" class="err oculto"></div><button class="full" onclick="entrar(ACT)">Entrar</button>'+
+      '<p class="muted" style="margin-top:10px">¿Olvidó el PIN? Pida a la coordinación de carnetización que lo borre y créelo de nuevo.</p>'+
+      '<button class="sec full" onclick="cerrarVelo()">Volver</button>');
+  } else {
+    velo('<h2>'+esc(e.o)+'</h2><div class="aviso">Primera vez. Confirme que esta es su institución. Quien entre primero crea el PIN: no lo comparta.</div>'+
+      '<label>Tipo de institución</label><select id="vTipo">'+opcionesTipo(e.t)+'</select>'+
+      '<label>Su cédula (solo números)</label><input id="vCed" inputmode="numeric" autocomplete="off">'+
+      '<label>Cree un PIN de 4 números</label><input id="vPin" type="password" inputmode="numeric" maxlength="4" autocomplete="off">'+
+      '<label>Repita el PIN</label><input id="vPin2" type="password" inputmode="numeric" maxlength="4" autocomplete="off">'+
+      '<div id="vErr" class="err oculto"></div><button class="full" onclick="entrar(ACT)">Guardar y entrar</button>'+
+      '<button class="sec full" style="margin-top:8px" onclick="cerrarVelo()">Volver</button>');
+  }
+}
+function validar(nuevo){
+  var pin = $('vPin').value.trim();
+  if (!/^\d{4}$/.test(pin)) return 'El PIN debe tener 4 números.';
+  if (nuevo){
+    if (!$('vTipo').value) return 'Elija el tipo de institución.';
+    if ($('vCed').value.replace(/\D/g,'').length < 6) return 'Escriba su cédula.';
+    if ($('vPin2').value.trim() !== pin) return 'Los dos PIN no son iguales.';
+  }
+  return '';
+}
+function irA(r){ location.href = 'index.html?e='+encodeURIComponent(r.e)+'&k='+encodeURIComponent(r.k); }
+async function entrar(c){
+  var e = escuela(c), nuevo = !e.pin, m = validar(nuevo); if (m) return error(m);
+  var pin=$('vPin').value.trim(), ced=nuevo?$('vCed').value.replace(/\D/g,''):'', tipo=nuevo?$('vTipo').value:'';
+  var guardado = $('veloC').innerHTML;
+  cargando('Entrando…');
+  try{ irA(await srv('entrarEscuela', P.m, P.k, c, ced, pin, tipo)); }
+  catch(x){ $('veloC').innerHTML = guardado; if (nuevo){ $('vTipo').value=tipo; $('vCed').value=ced; } error(String(x)); }
+}
+function formNueva(){
+  velo('<h2>Registrar mi institución</h2><p class="muted">Use esto solo si su institución no está en la lista de su municipio.</p>'+
+    '<label>Nombre completo de la institución</label><input id="nNom" style="text-transform:uppercase" autocomplete="off">'+
+    '<label>Tipo de institución</label><select id="vTipo">'+opcionesTipo('')+'</select>'+
+    '<label>Director(a)</label><input id="nDir" style="text-transform:uppercase" autocomplete="off">'+
+    '<label>Teléfono</label><input id="nTel" inputmode="tel" autocomplete="off">'+
+    '<label>Su cédula (solo números)</label><input id="vCed" inputmode="numeric" autocomplete="off">'+
+    '<label>Cree un PIN de 4 números</label><input id="vPin" type="password" inputmode="numeric" maxlength="4" autocomplete="off">'+
+    '<label>Repita el PIN</label><input id="vPin2" type="password" inputmode="numeric" maxlength="4" autocomplete="off">'+
+    '<div id="vErr" class="err oculto"></div><button class="full" onclick="crear()">Registrar y entrar</button>'+
+    '<button class="sec full" style="margin-top:8px" onclick="cerrarVelo()">Volver</button>');
+}
+async function crear(){
+  var nom=$('nNom').value.trim(); if (nom.length<5) return error('Escriba el nombre completo de la institución.');
+  var m = validar(true); if (m) return error(m);
+  var d = { nombre:nom, tipo:$('vTipo').value, director:$('nDir').value.trim(), tel:$('nTel').value.trim() };
+  var ced=$('vCed').value.replace(/\D/g,''), pin=$('vPin').value.trim(), guardado=$('veloC').innerHTML;
+  cargando('Registrando…');
+  try{ irA(await srv('nuevaEscuela', P.m, P.k, d, ced, pin)); }
+  catch(x){ $('veloC').innerHTML=guardado; $('nNom').value=d.nombre; $('vTipo').value=d.tipo; $('nDir').value=d.director; $('nTel').value=d.tel; $('vCed').value=ced; error(String(x)); }
+}
+arrancar();
+</script>
+</body></html>
