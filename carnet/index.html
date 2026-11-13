@@ -187,6 +187,17 @@ function reglaPrecio(){
 function fechaVE(iso){ var m=String(iso||'').split('-'); return m.length===3? m[2]+'/'+m[1]+'/'+m[0] : String(iso||''); }
 function diaAntes(iso){ var p=iso.split('-'), d=new Date(+p[0],+p[1]-1,+p[2]-1); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
 function precioEn(iso){ var P=D.precios||{base:D.precio}; return (P.desde && iso && iso>=P.desde) ? P.nuevo : P.base; }
+// Período de doble precio (Virginia 13-11): se aceptan transferencias al precio nuevo y al de antes. No se anuncia; solo se acepta.
+// Misma regla que valorar_ en Codigo.gs: lo pagado en el período doble cuadra si alcanza exacto con alguna mezcla de los dos precios.
+function enDoble(iso){ var P=D.precios||{}; return !!(P.doble && iso && iso>=P.desde && iso<=P.doble); }
+function valorar(T,cant){
+  var P=D.precios||{}, fijo=0, W=0;
+  T.forEach(function(t){ if(enDoble(t.fecha)) W+=t.monto; else fijo+=t.monto/precioEn(t.fecha); });
+  var valor=fijo+W/(P.nuevo||D.precio), n=cant-fijo;
+  if(W>0 && Math.abs(n-Math.round(n))<=0.001 && Math.round(n)>0){ n=Math.round(n);
+    var a=(W-P.base*n)/(P.nuevo-P.base); if(Math.abs(a-Math.round(a))<=0.001 && Math.round(a)>=0 && Math.round(a)<=n) valor=cant; }
+  return valor;
+}
 
 var MAXT = 300, NB = 0, BANCOS = ['Banco de Venezuela','Banesco','Mercantil','Provincial (BBVA)','Bicentenario','Banco del Tesoro','Bancaribe','BNC (Nacional de Crédito)','Exterior','Banco Plaza','Venezolano de Crédito','Sofitasa','Banco Activo','Bancamiga','100% Banco','Banplus','Fondo Común (BFC)','Banco Caroní','Banco Agrícola','Del Sur','Otro'];
 var SUBIDOS = {};   // capture ya subido por casilla: {i: {file, id}} (si algo falla, no se vuelve a subir)
@@ -235,8 +246,9 @@ function resumenPago(){
     var p = t.fecha ? precioEn(t.fecha) : 0;
     $('tV'+t.i).innerHTML = t.fecha ? 'Para esta fecha: '+bs(p)+' Bs por carnet' : '';
     if (!(t.monto>0) || !t.fecha) { faltan++; return; }
-    total += t.monto; valor += t.monto/p;
+    total += t.monto;
   });
+  if (!faltan) valor = valorar(T, cant);
   var v = Math.round(valor*100)/100, h='';
   if (!cant) h = '';
   else if (faltan) h = '<div class="aviso">Faltan el monto o la fecha en '+faltan+' transferencia(s). Llénelas todas para ver si cuadra con '+cant+' carnet(s).'+(total?' Van '+bs(total)+' Bs.':'')+'</div>';
@@ -260,8 +272,8 @@ async function enviarPago(){
     if(!t.banco) return err('Elija el banco desde donde pagó'+n+'.');
     if(!t.cuenta) return err('Indique a qué cuenta pagó'+n+'.');
     if(!t.file) return err('Suba el capture'+n+'.');
-    valor += t.monto/precioEn(t.fecha);
   }
+  valor = valorar(T, cant);
   if (Math.abs(valor-cant)>0.001) return err('Lo transferido alcanza para '+(Math.round(valor*100)/100).toLocaleString('es-VE')+' carnet(s) y usted indicó '+cant+'. Revise los montos y las fechas.'+(reglaPrecio()?' Recuerde: '+reglaPrecio().replace(/<[^>]+>/g,''):''));
   velo('<h2>Registrando pago…</h2><div class="barra"><i id="pBar" style="width:5%"></i></div><p class="muted" id="pBarT">Preparando…</p><p class="muted">No cierre esta página.</p>');
   try{
