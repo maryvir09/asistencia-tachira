@@ -146,6 +146,7 @@ function tarjetaLote(l){
     h += '<div class="persona"><div><b>'+esc(p.nombres+' '+p.apellidos)+'</b><small>'+esc(p.nac+'-'+p.cedula+' · '+p.cargo)+'</small> '+est+'</div>' +
          (abierto ? '<div class="fila"><button class="sec" onclick="editar('+p.fila+')">Ver / editar</button></div>' : '<button class="sec" onclick="verCarnet('+p.fila+')">Ver</button>') + '</div>';
   });
+  if (abierto) h += avisoRechazados(l, 'Corrija lo indicado y cárguela de nuevo con «Agregar persona» en este mismo grupo.');
   if (abierto && ps.length < l.cupos) h += '<button class="full" style="margin-top:10px" onclick="nueva(\''+l.lote+'\')">+ Agregar persona ('+(l.cupos-ps.length)+' cupo'+(l.cupos-ps.length>1?'s':'')+' libre'+(l.cupos-ps.length>1?'s':'')+')</button>';
   if (abierto) {
     var listo = l.estado==='ABIERTO' && ps.length===l.cupos && !ps.some(function(p){return p.estado==='POR APROBAR';});
@@ -155,6 +156,13 @@ function tarjetaLote(l){
   return h + '</div>';
 }
 
+// Personas que la coordinación no aprobó, con el motivo (D.rechazados no existe con el servidor viejo).
+function avisoRechazados(l, queHacer){
+  return (D.rechazados||[]).filter(function(r){return r.lote===l.lote;}).map(function(r){
+    return '<div class="err" style="margin-top:8px"><b>No aprobado por la coordinación:</b> '+esc(r.nombres+' '+r.apellidos)+' ('+esc(r.nac+'-'+r.cedula)+')'+
+           (r.motivo?'<br>Motivo: '+esc(r.motivo):'')+'<br>'+queHacer+'</div>';
+  }).join('');
+}
 function tarjetaCorreccion(l){
   var ps = personasDe(l.lote), falta = ps.filter(function(p){return p.estado==='CORREGIR';}).length;
   var h = '<div class="card" style="border:2px solid #f0c36a"><div class="fila" style="justify-content:space-between"><h2>Correcciones pendientes</h2><span class="chip warn">'+falta+' por corregir</span></div>' +
@@ -165,6 +173,7 @@ function tarjetaCorreccion(l){
          '<div class="'+(listo?'bien':'aviso')+'" style="margin:6px 0 0;padding:6px 10px">'+(listo?'Corregido ✓':esc(p.problema||'Revisar datos'))+'</div></div>' +
          '<button class="'+(listo?'sec':'')+'" onclick="editar('+p.fila+')">'+(listo?'Ver':'Corregir')+'</button></div>';
   });
+  h += avisoRechazados(l, 'En una corrección no se pueden agregar personas: comuníquese con la coordinación (contacto al final de la página).');
   h += '<button class="full ok" style="margin-top:12px" '+(falta?'disabled':'')+' onclick="terminar(\''+l.lote+'\')">Terminar correcciones y enviar</button>';
   return h + '</div>';
 }
@@ -367,7 +376,12 @@ function abrirForm(){
   '<label>Cargo</label><select id="fCargo"></select>'+
   '<div id="fAreaW" class="oculto"><label>Área del especialista</label><select id="fArea"><option value="">— elija —</option>'+AREAS.map(function(a){return '<option'+(P.area===a?' selected':'')+'>'+a+'</option>';}).join('')+'</select></div>'+
   '<div id="fOtroW" class="oculto"><label>Escriba el cargo</label><input id="fOtro" value="'+esc(P.cargoTexto||'')+'" autocapitalize="characters"><div class="muted">Un cargo nuevo lo revisa la coordinación antes de imprimir.</div></div>'+
-  '<label>Foto</label><input type="file" id="fFoto" accept="image/*"><div class="muted">De frente, en pared clara, de pecho hacia arriba. Nada de capturas de pantalla.</div><div id="fFotoMsg"></div>'+
+  '<label>Foto</label><div class="aviso" style="margin:4px 0 8px">📸 <b>Siga estas instrucciones para la foto:</b><ul style="margin:6px 0 0 18px;padding:0">'+
+    '<li>Tómela con la cámara del teléfono, no una captura de pantalla ni la foto de otra foto.</li>'+
+    '<li>De frente, mirando a la cámara, con la cara y los hombros completos.</li>'+
+    '<li>Fondo claro y liso (una pared blanca), con buena luz y sin sombras en la cara.</li>'+
+    '<li>Sin lentes oscuros, sin gorra, sin filtros.</li></ul></div>'+
+    '<input type="file" id="fFoto" accept="image/*"><div id="fFotoMsg"></div>'+
   '<div id="fErr"></div><div class="fila" style="margin-top:14px"><button class="sec" onclick="volver()">Cancelar</button><button id="bGuardar" onclick="guardar()">Guardar</button></div>'+
   '</div><div class="prev"><canvas id="cv"></canvas><div class="t">Así quedará el carnet. Revise cada letra.</div></div></div></div>';
   $('fNac').value=P.nac||'V'; $('fGen').value=P.genero||''; $('fTipo').value=P.tipo||''; $('fAtip').checked=!!P.atipico;

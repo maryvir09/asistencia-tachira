@@ -119,6 +119,8 @@ function abrir(c){
     velo('<h2>'+esc(e.o)+'</h2><div class="aviso">Primera vez. Confirme que esta es su institución. Quien entre primero crea el PIN: no lo comparta.</div>'+
       '<label>Tipo de institución</label><select id="vTipo">'+opcionesTipo(e.t)+'</select>'+
       '<label>Su cédula (solo números)</label><input id="vCed" inputmode="numeric" autocomplete="off">'+
+      '<label>Su teléfono (WhatsApp)</label><input id="vTel" type="tel" inputmode="tel" placeholder="0414-1234567" autocomplete="off">'+
+      '<p class="muted" style="margin:4px 0 0">Por aquí la coordinación le avisa cuando se confirme su pago o se apruebe una persona.</p>'+
       '<label>Cree un PIN de 4 números</label><input id="vPin" type="password" inputmode="numeric" maxlength="4" autocomplete="off">'+
       '<label>Repita el PIN</label><input id="vPin2" type="password" inputmode="numeric" maxlength="4" autocomplete="off">'+
       '<div id="vErr" class="err oculto"></div><button class="full" onclick="entrar(ACT)">Guardar y entrar</button>'+
@@ -131,18 +133,20 @@ function validar(nuevo){
   if (nuevo){
     if (!$('vTipo').value) return 'Elija el tipo de institución.';
     if ($('vCed').value.replace(/\D/g,'').length < 6) return 'Escriba su cédula.';
+    if ($('vTel') && !telValido($('vTel').value)) return 'Escriba su teléfono celular (WhatsApp), por ejemplo 0414-1234567.';
     if ($('vPin2').value.trim() !== pin) return 'Los dos PIN no son iguales.';
   }
   return '';
 }
+function telValido(t){ var d=String(t||'').replace(/\D/g,''); if (d.length===12 && d.slice(0,2)==='58') d='0'+d.slice(2); if (d.length===10 && d[0]!=='0') d='0'+d; return d.length===11 && d.slice(0,2)==='04'; }   // celular: es para WhatsApp
 function irA(r){ location.href = 'index.html?e='+encodeURIComponent(r.e)+'&k='+encodeURIComponent(r.k); }
 async function entrar(c){
   var e = escuela(c), nuevo = !e.pin, m = validar(nuevo); if (m) return error(m);
-  var pin=$('vPin').value.trim(), ced=nuevo?$('vCed').value.replace(/\D/g,''):'', tipo=nuevo?$('vTipo').value:'';
+  var pin=$('vPin').value.trim(), ced=nuevo?$('vCed').value.replace(/\D/g,''):'', tipo=nuevo?$('vTipo').value:'', tel=nuevo&&$('vTel')?$('vTel').value.trim():'';
   var guardado = $('veloC').innerHTML;
   cargando('Entrando…');
-  try{ irA(await srv('entrarEscuela', P.m, P.k, c, ced, pin, tipo)); }
-  catch(x){ $('veloC').innerHTML = guardado; if (nuevo){ $('vTipo').value=tipo; $('vCed').value=ced; } error(String(x)); }
+  try{ irA(await srv('entrarEscuela', P.m, P.k, c, ced, pin, tipo, tel)); }
+  catch(x){ $('veloC').innerHTML = guardado; if (nuevo){ $('vTipo').value=tipo; $('vCed').value=ced; $('vTel').value=tel; } error(String(x)); }
 }
 function formNueva(){
   velo('<h2>Registrar mi institución</h2><p class="muted">Use esto solo si su institución no está en la lista de su municipio.</p>'+
