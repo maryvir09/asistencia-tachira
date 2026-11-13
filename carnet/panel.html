@@ -57,6 +57,8 @@ function mio(m){ return !MIOS || !D.misMunicipios.length || D.misMunicipios.inde
 function $(id){return document.getElementById(id);}
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function bs(n){return Number(n).toLocaleString('es-VE');}
+// Carnets por archivo PDF: 25 (unos 16 MB por envío; con 50 eran unos 32 MB). Decisión de Virginia 13-11.
+var POR_PDF = 25;
 var API = 'https://script.google.com/macros/s/AKfycbymxmjlvceY5IaQkz28MOsvxwk7TNmNXQ5cKL92t6aA1-eiSxvRmFMFy54w_70ALltTzg/exec';
 // Igual que la página de las escuelas: se llama al servidor por la puerta web. Solo se reintenta lo que no guarda nada.
 async function srv(fn){
@@ -211,7 +213,7 @@ async function pdf(lote){
       var im = await doc.embedJpg(jpg);
       var pg = doc.addPage([mmPt(62), mmPt(95)]); pg.drawImage(im, {x:0, y:0, width:mmPt(62), height:mmPt(95)});
       n++; $('bar').style.width = Math.round(100*(i+1)/d.personas.length)+'%'; $('barT').textContent=(i+1)+' de '+d.personas.length;
-      if (n===50 || i===d.personas.length-1){ partes.push(await doc.saveAsBase64({dataUri:true})); n=0; }
+      if (n===POR_PDF || i===d.personas.length-1){ partes.push(await doc.saveAsBase64({dataUri:true})); n=0; }
     }
     var base = (d.escuela.municipio+' - '+d.escuela.corto+' - '+d.personas.length+' carnets'+(d.tipo==='CORRECCION'?' - CORRECCION':'')).replace(/[\\/:*?"<>|]/g,'');
     var links=[]; window.PARTES=[];
