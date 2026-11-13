@@ -123,11 +123,7 @@ function chipLote(l){
 }
 function personasDe(lote){ return D.personas.filter(function(p){return p.lote===lote;}); }
 
-var ENVIADOS = ['TERMINADO','PDF GENERADO','IMPRESO'];
 function tarjetaLote(l){
-  if (ENVIADOS.indexOf(l.estado)>=0)
-    return '<div class="card"><div class="fila" style="justify-content:space-between"><h2>Grupo de '+l.cupos+' carnet'+(l.cupos>1?'s':'')+'</h2>'+chipLote(l)+'</div>'+
-           '<div class="muted">Grupo enviado a la coordinación'+(l.terminado?' el '+esc(l.terminado):'')+'. Ya no se puede modificar.</div></div>';
   var ps = personasDe(l.lote), abierto = ['PAGO EN ESPERA','ABIERTO'].indexOf(l.estado)>=0;
   var h = '<div class="card"><div class="fila" style="justify-content:space-between"><h2>Grupo de '+l.cupos+' carnet'+(l.cupos>1?'s':'')+'</h2>'+chipLote(l)+'</div>';
   var et={'EN ESPERA':'<span class="chip warn">en espera</span>','CONFIRMADO':'<span class="chip ok">confirmado</span>','RECHAZADO':'<span class="chip bad">rechazado</span>','ANULADO':'<span class="chip">anulado</span>'};
@@ -146,7 +142,7 @@ function tarjetaLote(l){
   if (l.estado==='PAGO EN ESPERA' && !porReemplazar.length) h += '<div class="aviso">El pago se confirma cuando la coordinación carga el estado de cuenta (todos los días después de la 1:00 p. m.'+(D.ultimaCarga?'; última carga: '+esc(D.ultimaCarga):'')+'). Mientras tanto ya puede cargar a su personal.</div>';
   if (l.estado==='PAGO RECHAZADO') { var rj=(l.pagos||[]).filter(function(t){return t.estado==='RECHAZADO';})[0]; h += '<div class="err">La coordinación no encontró este pago'+(rj?' (ref. …'+esc(String(rj.ref).slice(-6))+')':'')+'. '+esc(rj&&rj.nota||'')+' Registre el pago de nuevo con los datos correctos.</div>'; }
   h += '<div class="barra" style="margin:10px 0"><i style="width:'+Math.round(100*ps.length/l.cupos)+'%"></i></div><div class="muted">'+ps.length+' de '+l.cupos+' cargados</div>';
-  if (abierto) ps.forEach(function(p){   // las personas solo se ven mientras el grupo está abierto (decisión de Virginia 13-11)
+  ps.forEach(function(p){   // los grupos enviados se ven pero no se editan (Virginia 13-11: los datos son responsabilidad de la escuela)
     var est = p.estado==='POR APROBAR' ? '<span class="chip warn">Esperando aprobación</span>' : '';
     h += '<div class="persona"><div><b>'+esc(p.nombres+' '+p.apellidos)+'</b><small>'+esc(p.nac+'-'+p.cedula+' · '+p.cargo)+'</small> '+est+'</div>' +
          (abierto ? '<div class="fila"><button class="sec" onclick="editar('+p.fila+')">Ver / editar</button></div>' : '<button class="sec" onclick="verCarnet('+p.fila+')">Ver</button>') + '</div>';
