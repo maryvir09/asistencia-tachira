@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel de carnetización</title>
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<style>
+:root{--navy:#0e2d5c;--purple:#583aa0;--pink:#c2457e;--bg:#f4f2fa;--card:#fff;--line:#e3dff0;--txt:#1d1b2a;--muted:#6b6880;
+--ok:#1f7a45;--okbg:#e4f4ea;--warn:#8a5a00;--warnbg:#fdf1d8;--bad:#a12b2b;--badbg:#fbe6e6;--r:14px}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:linear-gradient(120deg,var(--navy),var(--purple) 70%,var(--pink));color:#fff;padding:18px 16px 22px;border-radius:0 0 22px 22px}
+header .k{font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.8}header h1{margin:4px 0 2px;font-size:21px;line-height:1.25}
+header .s{font-size:14px;opacity:.9}main{max-width:720px;margin:0 auto;padding:14px 14px 260px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin:14px 0}
+.card h2{margin:0 0 6px;font-size:18px;color:var(--navy)}.muted{color:var(--muted);font-size:14px}
+.chip{display:inline-block;font-size:12px;font-weight:600;padding:3px 9px;border-radius:99px;background:#ece9f6;color:var(--purple)}
+.chip.ok{background:var(--okbg);color:var(--ok)}.chip.warn{background:var(--warnbg);color:var(--warn)}.chip.bad{background:var(--badbg);color:var(--bad)}
+button,.btn{font:inherit;font-weight:600;border:0;border-radius:12px;padding:12px 16px;cursor:pointer;background:var(--navy);color:#fff;min-height:46px}
+button.sec{background:#ece9f6;color:var(--navy)}button.peligro{background:var(--badbg);color:var(--bad)}button.ok{background:var(--ok)}
+button:disabled{opacity:.45;cursor:not-allowed}.fila{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.full{width:100%}
+label{display:block;font-size:14px;font-weight:600;margin:12px 0 4px;color:var(--navy)}
+#fNom,#fApe,#fOtro{text-transform:uppercase}
+input,select,textarea{font:inherit;width:100%;padding:11px 12px;border:1px solid #cfc9e3;border-radius:10px;background:#fff;color:var(--txt)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--purple);border-color:transparent}
+.err{background:var(--badbg);color:var(--bad);border-radius:10px;padding:10px 12px;margin:10px 0;font-size:15px}
+.aviso{background:var(--warnbg);color:var(--warn);border-radius:10px;padding:10px 12px;margin:10px 0;font-size:15px}
+.bien{background:var(--okbg);color:var(--ok);border-radius:10px;padding:10px 12px;margin:10px 0;font-size:15px}
+.persona{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.persona:first-child{border-top:0}.persona b{display:block;font-size:15px}.persona small{color:var(--muted)}
+.vista{display:flex;gap:16px;flex-wrap:wrap}.vista .form{flex:1 1 300px;min-width:0}.vista .prev{flex:0 0 260px;margin:0 auto}@media(max-width:620px){.vista .prev{order:-1}.prev canvas{width:210px;margin:0 auto}}
+.prev canvas{width:260px;height:auto;border-radius:10px;box-shadow:0 6px 24px rgba(14,45,92,.18);display:block;background:#eee}
+.prev .t{font-size:13px;color:var(--muted);text-align:center;margin-top:6px}
+.velo{position:fixed;inset:0;background:rgba(14,20,40,.45);display:flex;align-items:flex-start;justify-content:center;z-index:9;overflow-y:auto;padding:16px 0 40px;-webkit-overflow-scrolling:touch}
+.velo .card{max-width:420px;width:92%}.oculto{display:none!important}
+.barra{height:8px;background:#e6e2f3;border-radius:9px;overflow:hidden}.barra i{display:block;height:100%;background:linear-gradient(90deg,var(--navy),var(--purple))}
+table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:8px 6px;border-top:1px solid var(--line);text-align:left;vertical-align:top}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}.tabs button{background:#fff;color:var(--navy);border:1px solid var(--line);min-height:40px;padding:8px 12px}
+.tabs button.act{background:var(--navy);color:#fff}
+@media(max-width:620px){.prev canvas{width:210px;margin:0 auto}}
+html,body{overflow-x:hidden}.fila>input{min-width:0;flex:1 1 auto;width:auto}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+</head><body>
+<header><div class="k">Identity Soluciones · Carnetización</div><h1>Panel de control</h1><div class="s" id="hSub">Cargando…</div><button class="sec" style="margin-top:8px;font-size:13px;padding:6px 10px" onclick="salir()">Salir de este equipo</button></header>
+<main>
+  <div class="tabs" id="tabs"></div>
+  <div id="app"></div>
+</main>
+<div id="velo" class="velo oculto"><div class="card" id="veloC"></div></div>
+<script src="qr.js?v=1"></script>
+<script src="render.js?v=1"></script>
+<script>
+var PARAMS = (function(){ var o={}; new URLSearchParams(location.search).forEach(function(v,k){ o[k]=v; });
+  try{ if (o.admin) { localStorage.setItem('panel_k', o.admin); history.replaceState(null, '', location.pathname); } else o.admin = localStorage.getItem('panel_k') || ''; }catch(e){}
+  return o; })(), K = PARAMS.admin, D = null, TAB = 'pagos', MIOS = true;
+function mio(m){ return !MIOS || !D.misMunicipios.length || D.misMunicipios.indexOf(String(m||'').toUpperCase().trim())>=0; }
+function $(id){return document.getElementById(id);}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function bs(n){return Number(n).toLocaleString('es-VE');}
+var API = 'https://script.google.com/macros/s/AKfycbymxmjlvceY5IaQkz28MOsvxwk7TNmNXQ5cKL92t6aA1-eiSxvRmFMFy54w_70ALltTzg/exec';
+// Igual que la página de las escuelas: se llama al servidor por la puerta web. Solo se reintenta lo que no guarda nada.
+async function srv(fn){
+  var a=[].slice.call(arguments,1), r, x, leer=['panel','fotoAdmin','lotePdf','enlacesMunicipios'].indexOf(fn)>=0, veces=leer?2:1;
+  for (var intento=0; intento<veces; intento++){
+    try{ r = await fetch(API, {method:'POST', body: JSON.stringify({fn:fn, args:a}), headers:{'Content-Type':'text/plain;charset=utf-8'}}); x = await r.json(); break; }
+    catch(e){ if (intento===veces-1) throw (leer ? 'No hay conexión con el sistema. Revise su internet e intente de nuevo.' : 'Se cortó la conexión. Antes de repetir, recargue el panel y revise si ya quedó hecho.'); await new Promise(function(ok){setTimeout(ok,1500);}); }
+  }
+  if (!x || !x.ok) throw (x && x.error) || 'El sistema no respondió. Intente de nuevo.';
+  return x.data;
+}
+function img(src){return new Promise(function(ok,ko){var i=new Image();i.onload=function(){ok(i)};i.onerror=ko;i.src=src;});}
+function velo(h){$('veloC').innerHTML=h;$('velo').classList.remove('oculto');}
+function cerrarVelo(){$('velo').classList.add('oculto');}
+function cargando(m){velo('<h2>'+esc(m||'Trabajando…')+'</h2><div class="barra"><i id="bar" style="width:20%"></i></div><p class="muted" id="barT"></p>');}
+function fallo(m){velo('<h2>No se pudo</h2><div class="err">'+esc(m)+'</div><button class="full" onclick="cerrarVelo()">Cerrar</button>');}
+
+async function arrancar(){ if (!K) { $('hSub').textContent=''; $('app').innerHTML='<div class="card"><div class="err">Falta la clave del panel. Abra el enlace completo que le dio la coordinación (está en el archivo ENLACES_PANEL_PRIVADO).</div></div>'; return; } try{ D = await srv('panel', K); pintar(); }catch(e){ if (/incorrecta/.test(String(e))) { try{ localStorage.removeItem('panel_k'); }catch(x){} e = String(e) + ' Abra el enlace completo que le dio la coordinación (está en el archivo ENLACES_PANEL_PRIVADO).'; } $('app').innerHTML='<div class="card"><div class="err">'+esc(e)+'</div></div>'; } }
+function set(d){ D=d; pintar(); }
+
+function pintar(){
+  var term = D.lotes.filter(function(l){return l.estado==='TERMINADO' && mio(l.municipio);}).length;
+  var nAl = D.alertas.filter(function(a){return mio(a.municipio);}).length;
+  $('hSub').textContent = 'Hola, ' + D.usuario + ' · Última carga del estado de cuenta: ' + (D.ultimaCarga || 'nunca');
+  var nP = {}; D.pagos.forEach(function(p){ nP[p.lote||p.id]=1; });
+  var t=[['pagos','Pagos en espera ('+Object.keys(nP).length+')'],['banco','Cargar estado de cuenta'],['alertas','Alertas ('+nAl+')'],['lotes','Para revisar ('+term+')'],['enlaces','Enlaces de escuelas']];
+  var filtro = D.misMunicipios.length ? '<label style="display:flex;gap:6px;align-items:center;font-weight:500;margin:0 0 0 6px"><input type="checkbox" style="width:auto" '+(MIOS?'checked':'')+' onchange="MIOS=this.checked;pintar()"> Solo mis municipios</label>' : '';
+  $('tabs').innerHTML = filtro + t.map(function(x){return '<button class="'+(TAB===x[0]?'act':'')+'" onclick="TAB=\''+x[0]+'\';pintar()">'+x[1]+'</button>';}).join('');
+  $('app').innerHTML = ({pagos:vPagos, banco:vBanco, alertas:vAlertas, lotes:vLotes, enlaces:vEnlaces})[TAB]();
+}
+
+function vPagos(){
+  // un pago = un grupo (lote) que puede traer varias transferencias
+  var grupos = {}, orden = [];
+  D.pagos.forEach(function(p){ var g=p.lote||p.id; if(!grupos[g]){ grupos[g]=[]; orden.push(g); } grupos[g].push(p); });
+  if(!orden.length) return '<div class="card"><div class="bien">No hay pagos esperando.</div></div>';
+  var et={'EN ESPERA':'warn','CONFIRMADO':'ok','RECHAZADO':'bad'};
+  return orden.map(function(g){
+    var T = grupos[g], L = D.lotes.filter(function(l){return l.lote===g;})[0], total = T.reduce(function(s,t){return s+t.monto;},0);
+    var conf = T.filter(function(t){return t.estado==='CONFIRMADO';}).length;
+    var h = '<div class="card"><div class="fila" style="justify-content:space-between"><h2>'+esc(T[0].escuela)+'</h2><span class="chip warn">'+(L?L.cupos:T[0].cupos)+' carnets</span></div>'+
+      '<div class="muted">'+esc(T[0].municipio)+' · Total '+bs(total)+' Bs'+(T.length>1?' en '+T.length+' transferencias · '+conf+' de '+T.length+' confirmadas':'')+' · Subido '+esc(T[0].fecha)+'</div>';
+    T.forEach(function(p,i){
+      h += '<div style="border-top:1px solid var(--line);margin-top:10px;padding-top:8px">'+(T.length>1?'<b>Transferencia '+(i+1)+'</b> <span class="chip '+(et[p.estado]||'')+'">'+esc(p.estado)+'</span>':'')+
+        '<table><tr><td>Monto</td><td><b>'+bs(p.monto)+' Bs</b>'+(T.length>1?' (vale '+String(p.cupos).replace('.',',')+' carnet)':'')+'</td></tr><tr><td>Referencia</td><td><b>'+esc(p.ref)+'</b></td></tr><tr><td>Fecha del pago</td><td>'+esc(p.fechaPago)+'</td></tr>'+
+        '<tr><td>Banco origen</td><td>'+esc(p.banco)+'</td></tr><tr><td>Cuenta</td><td>'+esc(p.cuenta)+'</td></tr></table>'+
+        (/REVISAR/.test(p.nota)?'<div class="aviso">'+esc(p.nota)+'</div>':'')+
+        '<div class="fila" style="margin-top:6px"><a class="btn sec" style="text-decoration:none;background:#ece9f6;color:#0e2d5c" href="'+esc(p.capture)+'" target="_blank">Ver capture</a>'+
+        (p.estado==='EN ESPERA'?'<button class="ok" onclick="pago(\''+p.id+'\',true)">Confirmar a mano</button><button class="peligro" onclick="pago(\''+p.id+'\',false)">Rechazar</button>':'')+'</div></div>';
+    });
+    return h + '</div>';
+  }).join('');
+}
+async function pago(id, ok){
+  var nota = ok ? 'Confirmado a mano en el panel' : prompt('¿Por qué se rechaza? (lo verá la escuela). Ojo: si el pago tiene varias transferencias, se rechaza el pago completo y la escuela lo registra de nuevo.');
+  if (!ok && nota===null) return;
+  var p = D.pagos.filter(function(x){return x.id===id;})[0] || {};
+  cargando(); try{ set(await srv('confirmarPago', K, id, ok, nota)); }catch(e){ return fallo(e); }
+  ofrecerWA(p.escuela, '', 'el pago de la escuela '+p.escuela+' (transferencia ref. …'+String(p.ref||'').slice(-6)+' por '+bs(p.monto)+' Bs) '+
+    (ok ? 'fue CONFIRMADO. Ya puede continuar desde su enlace de carnetización.' : 'fue RECHAZADO. Motivo: '+(nota||'no se encontró en el estado de cuenta')+'. Entre a su enlace de carnetización y suba la transferencia correcta.'));
+}
+
+function vBanco(){
+  return '<div class="card"><h2>Cargar estado de cuenta</h2><p class="muted">Copie los movimientos de la página del banco (BDV) <b>tal como salen</b>, con todas sus columnas, y péguelos aquí. El sistema toma solo los <b>créditos</b>. Elija bien <b>de quién es</b> el estado de cuenta: el sistema no lo puede comprobar. Se confirman solos los pagos cuya referencia (últimos 6 números), monto y cuenta coincidan.</p>'+
+    '<label>Cuenta</label><select id="bC"><option>Virginia</option><option>Edison</option><option>Rossy</option></select>'+
+    '<label>Movimientos</label><textarea id="bT" rows="10" placeholder="10/11/2026	0677292089563	50000"></textarea>'+
+    '<div class="fila" style="margin-top:12px"><button onclick="banco()">Cargar y conciliar</button><button class="sec" onclick="conc()">Solo conciliar otra vez</button></div><div id="bR"></div></div>';
+}
+async function banco(){ cargando('Cargando estado de cuenta…'); try{ var r=await srv('cargarBanco',K,$('bC').value,$('bT').value); D=await srv('panel',K); TAB='banco'; pintar(); cerrarVelo(); $('bR').innerHTML='<div class="bien">'+r.cargadas+' movimientos cargados. '+esc(r.conciliacion)+'</div>'; }catch(e){ fallo(e); } }
+async function conc(){ cargando(); try{ var r=await srv('conciliar',K); D=await srv('panel',K); pintar(); cerrarVelo(); $('bR').innerHTML='<div class="bien">'+esc(r.msg)+'</div>'; }catch(e){ fallo(e); } }
+
+function vAlertas(){
+  var A = D.alertas.filter(function(a){return mio(a.municipio);});
+  if(!A.length) return '<div class="card"><div class="bien">No hay alertas pendientes.</div></div>';
+  return A.map(function(a){
+    return '<div class="card"><div class="fila" style="justify-content:space-between"><h2>'+esc(a.persona)+'</h2><span class="chip warn">'+esc(a.tipo)+'</span></div>'+
+      '<div class="muted">Cédula '+esc(a.cedula)+' · Escuela '+esc(a.escuela)+' ('+esc(a.municipio)+') · '+esc(a.fecha)+'</div><div class="aviso">'+esc(a.detalle)+'</div>'+
+      (a.tel?'<div class="muted">Director(a): '+esc(a.tel)+'</div>':'')+
+      (/^[\w-]+$/.test(a.foto||'')?'<button class="sec" style="margin-top:8px" onclick="verFoto(\''+a.foto+'\')">Ver foto</button>':'')+
+      (['PIN NUEVO','ESCUELA BLOQUEADA','ESCUELA NUEVA'].indexOf(a.tipo)>=0
+        ? '<div class="fila" style="margin-top:8px"><button class="sec" onclick="FILTRO=\''+esc(a.escuela)+'\';TAB=\'enlaces\';pintar()">Ver la escuela</button><button class="ok" onclick="alerta('+a.fila+',true)">Ya lo revisé</button></div></div>'
+        : '<div class="fila" style="margin-top:8px"><button class="ok" onclick="alerta('+a.fila+',true)">Aprobar</button><button class="peligro" onclick="alerta('+a.fila+',false)">Rechazar</button></div></div>');
+  }).join('');
+}
+async function alerta(f, ok){
+  var nota = ok ? '' : prompt('¿Por qué se rechaza? (lo verá la escuela)'); if(!ok && nota===null) return;
+  var a = D.alertas.filter(function(x){return x.fila===f;})[0] || {}, aviso = ['PIN NUEVO','ESCUELA BLOQUEADA','ESCUELA NUEVA'].indexOf(a.tipo)>=0;
+  var d; cargando(); try{ d = await srv('resolverAlerta',K,f,ok,nota); set(d); }catch(e){ return fallo(e); }
+  if (aviso) return cerrarVelo();   // avisos del sistema: no hay nada que decirle al director
+  // Avisar solo lo que de verdad pasó (la persona puede tener otra alerta pendiente o ya estar anulada).
+  var est = (d.resultado||{}).estado;
+  if (ok && est === 'POR APROBAR') return velo('<h2>Listo</h2><div class="aviso">'+esc(a.persona)+' todavía tiene otra alerta pendiente. Cuando la resuelva, le ofrezco avisar al director.</div><button class="full" onclick="cerrarVelo()">Cerrar</button>');
+  if (!est) return velo('<h2>Listo</h2><div class="aviso">'+esc(a.persona)+' ya no estaba esperando aprobación (quedó anotado «revisar a mano»). No se ofrece aviso por WhatsApp.</div><button class="full" onclick="cerrarVelo()">Cerrar</button>');
+  ofrecerWA(a.escuela, a.tel, ok ? 'se APROBÓ a '+a.persona+' (cédula '+a.cedula+'). Ya puede continuar desde su enlace de carnetización.'
+    : 'NO se aprobó a '+a.persona+' (cédula '+a.cedula+'). Motivo: '+(nota||a.detalle)+'. Entre a su enlace de carnetización: allí verá el motivo y lo que debe hacer.');
+}
+async function verFoto(id){
+  cargando('Buscando la foto…');
+  try{ var src = await srv('fotoAdmin', K, id); velo('<h2>Foto</h2><img src="'+esc(src)+'" style="display:block;max-width:100%;max-height:65vh;margin:0 auto;border-radius:8px"><button class="full" style="margin-top:10px" onclick="cerrarVelo()">Cerrar</button>'); }
+  catch(e){ fallo(e); }
+}
+// WhatsApp al director: número de la alerta o el de la hoja Escuelas (col. G). El mensaje se puede corregir antes de mandarlo.
+function telEscuela(cod){ var c=String(cod||'').trim().toUpperCase(), e=(D.escuelas||[]).filter(function(x){return String(x[0]).trim().toUpperCase()===c;})[0]; return e?String(e[6]||''):''; }
+function waUrl(tel, msg){
+  var d = String(tel||'').replace(/\D/g,'');
+  if (d.length===12 && d.slice(0,2)==='58') d = d.slice(2); else if (d.length===11 && d[0]==='0') d = d.slice(1);
+  return d.length===10 && d[0]==='4' ? 'https://wa.me/58'+d+'?text='+encodeURIComponent(msg) : '';   // solo celular
+}
+var TELWA = '';
+function ofrecerWA(cod, tel, cuerpo){
+  TELWA = waUrl(telEscuela(cod),'x') ? telEscuela(cod) : tel;   // primero el de la hoja Escuelas (el más al día)
+  var msg = 'Saludos. Le escribe la coordinación de carnetización del Táchira. Le informamos que '+cuerpo+'\n— '+(D.usuario||'Coordinación');
+  var u = waUrl(TELWA, msg);
+  velo('<h2>Listo</h2>'+(u ? '<p class="muted">¿Avisar al director por WhatsApp? Puede corregir el mensaje antes de mandarlo.</p>'
+      : '<div class="aviso">Esta escuela no tiene un celular del director válido en la hoja Escuelas. Copie el mensaje y avísele por otro medio.</div>')+
+    '<textarea rows="7" id="wMsg" oninput="var a=$(\'wLnk\'); if(a) a.href=waUrl(TELWA,this.value)">'+esc(msg)+'</textarea>'+
+    (u ? '<a id="wLnk" class="btn full" style="display:block;text-align:center;text-decoration:none;margin-top:8px" href="'+esc(u)+'" target="_blank" rel="noopener" onclick="setTimeout(cerrarVelo,300)">Avisar por WhatsApp ('+esc(TELWA)+')</a>' : '')+
+    '<button class="sec full" style="margin-top:8px" onclick="cerrarVelo()">'+(u?'No avisar':'Cerrar')+'</button>');
+}
+
+function vLotes(){
+  var L = D.lotes.filter(function(l){return ['TERMINADO','PDF GENERADO'].indexOf(l.estado)>=0 && mio(l.municipio);});
+  var h = L.length ? '' : '<div class="card"><div class="bien">No hay grupos esperando revisión.</div></div>';
+  h += L.map(function(l){
+    return '<div class="card"><div class="fila" style="justify-content:space-between"><h2>'+esc(l.escuela)+' · '+l.cargados+' carnets</h2><span class="chip '+(l.estado==='TERMINADO'?'warn':'ok')+'">'+(l.tipo==='CORRECCION'?'Corrección · ':'')+esc(l.estado)+'</span></div>'+
+      '<div class="muted">'+esc(l.municipio)+' · Terminado por '+esc(l.quien)+' · '+esc(l.cuando)+(l.revisado?' · PDF: '+esc(l.revisado):'')+'</div>'+
+      (l.pdf?'<div style="margin-top:6px">'+l.pdf.split('\n').map(function(u,i){return '<a href="'+esc(u)+'" target="_blank">Abrir PDF guardado'+(l.pdf.indexOf('\n')>=0?' (parte '+(i+1)+')':'')+'</a>';}).join('<br>')+'</div>':'')+
+      '<div class="fila" style="margin-top:10px"><button onclick="pdf(\''+l.lote+'\')">'+(l.pdf?'Generar otra vez':'Ver carnets y generar PDF')+'</button>'+
+      (l.pdf?'<button class="ok" onclick="impreso(\''+l.lote+'\')">Marcar como impreso</button>':'')+'</div></div>';
+  }).join('');
+  var imp = D.lotes.filter(function(l){return l.estado==='IMPRESO';}).length;
+  return h + '<p class="muted">Grupos ya impresos: '+imp+'</p>';
+}
+async function impreso(lote){ if(!confirm('¿Confirma que este grupo ya se mandó a imprenta?')) return; cargando(); try{ set(await srv('marcarImpreso',K,lote)); cerrarVelo(); }catch(e){ fallo(e); } }
+
+function mmPt(mm){ return mm*72/25.4; }
+async function pdf(lote){
+  cargando('Preparando carnets…');
+  try{
+    var d = await srv('lotePdf', K, lote);
+    await CARNET.loadFonts(d.assets.fonts);
+    var bg={}; for (var g in d.assets.bg) bg[g]=await img(d.assets.bg[g]);
+    var inst={corto:d.escuela.corto, oficial:d.escuela.oficial, periodo:d.periodo};
+    var cv=document.createElement('canvas'), partes=[], doc=null, n=0, thumbs=[];
+    for (var i=0;i<d.personas.length;i++){
+      var p=d.personas[i];
+      if (n===0) doc = await PDFLib.PDFDocument.create();
+      var foto = p.foto ? await img(await srv('fotoAdmin', K, p.foto)) : null;
+      CARNET.render(cv, bg[CARNET.grupo(p.tipo)], {nombres:p.nombres, apellidos:p.apellidos, nombre:p.nombres+' '+p.apellidos, ci:p.nac+'-'+p.cedula, tipo:p.tipo, cargo:p.cargo}, inst, foto);
+      var jpg = cv.toDataURL('image/jpeg', 0.95);
+      thumbs.push('<figure style="margin:0"><img src="'+jpg+'" style="width:150px;border-radius:6px;box-shadow:0 2px 8px #0002"><figcaption class="muted" style="width:150px;font-size:12px">'+(i+1)+'. '+esc(p.nombres+' '+p.apellidos)+'</figcaption></figure>');
+      var im = await doc.embedJpg(jpg);
+      var pg = doc.addPage([mmPt(62), mmPt(95)]); pg.drawImage(im, {x:0, y:0, width:mmPt(62), height:mmPt(95)});
+      n++; $('bar').style.width = Math.round(100*(i+1)/d.personas.length)+'%'; $('barT').textContent=(i+1)+' de '+d.personas.length;
+      if (n===50 || i===d.personas.length-1){ partes.push(await doc.saveAsBase64({dataUri:true})); n=0; }
+    }
+    var base = (d.escuela.municipio+' - '+d.escuela.corto+' - '+d.personas.length+' carnets'+(d.tipo==='CORRECCION'?' - CORRECCION':'')).replace(/[\\/:*?"<>|]/g,'');
+    var links=[]; window.PARTES=[];
+    for (var j=0;j<partes.length;j++){
+      var nom = base + (partes.length>1?' - parte '+(j+1)+' de '+partes.length:'') + '.pdf';
+      $('barT').textContent='Guardando en Drive '+(j+1)+' de '+partes.length+'…';
+      links.push(await srv('guardarPdf', K, lote, partes[j], nom, j+1)); PARTES.push([partes[j],nom]);
+    }
+    D = await srv('panel', K); pintar();
+    velo('<h2>PDF listo</h2><div class="bien">Quedó guardado en la carpeta «PDF PARA IMPRENTA».</div>'+PARTES.map(function(x,i){return '<button class="full" style="margin:6px 0" onclick="bajar('+i+')">Descargar '+esc(x[1])+'</button>';}).join('')+'<p class="muted">Revise cada carnet antes de mandarlo a la imprenta:</p><div class="fila" style="align-items:flex-start">'+thumbs.join('')+'</div><button class="full" style="margin-top:12px" onclick="cerrarVelo()">Cerrar</button>');
+  }catch(e){ fallo(e); }
+}
+
+function bajar(i){ var a=document.createElement('a'); a.href=PARTES[i][0]; a.download=PARTES[i][1]; document.body.appendChild(a); a.click(); a.remove(); }
+var FILTRO='';
+function vEnlaces(){
+  var f = FILTRO.toUpperCase(), lista = D.escuelas.filter(function(e){ return !f || (e[0]+' '+e[1]+' '+e[2]+' '+e[3]).toUpperCase().indexOf(f)>=0; }).slice(0,40);
+  return '<div class="card"><h2>Enlaces por municipio (para los jefes de centro)</h2><p class="muted">Un enlace por municipio. El jefe de centro lo reparte a sus directores; cada director busca su escuela y entra con su PIN.</p>'+
+    (MUNS?'<table><tr><th>Municipio</th><th></th></tr>'+MUNS.map(function(x,i){return '<tr><td>'+esc(x.municipio)+'</td><td>'+(x.url?'<button class="sec" onclick="copiarMun('+i+')">Copiar mensaje</button>':'<small class="muted">sin clave</small>')+'</td></tr>';}).join('')+'</table>':'<button class="sec" onclick="verMuns()">Ver los enlaces de los municipios</button>')+'</div>'+
+    '<div class="card"><h2>Crear enlace para una escuela</h2><input id="fil" placeholder="Busque por nombre, municipio o código" value="'+esc(FILTRO)+'" oninput="FILTRO=this.value;var p=this.selectionStart;pintar();$(\'fil\').focus();$(\'fil\').setSelectionRange(p,p)">'+
+    '<table><tr><th>Código</th><th>Escuela</th><th>Estado</th><th></th></tr>'+lista.map(function(e){
+      return '<tr><td>'+esc(e[0])+'</td><td>'+esc(e[2])+'<br><small class="muted">'+esc(e[1])+'</small></td><td>'+esc(e[8])+(e[7]?' · <b>con enlace</b>':'')+(e[9]==='SÍ'?' · <b>con PIN</b>':'')+'</td><td><button class="sec" onclick="formEnlace(\''+esc(e[0])+'\')">'+(e[7]?'Ver enlace':'Crear')+'</button></td></tr>';
+    }).join('')+'</table></div>';
+}
+var MUNS=null;
+async function verMuns(){ cargando('Buscando enlaces…'); try{ MUNS=await srv('enlacesMunicipios',K); pintar(); cerrarVelo(); }catch(e){ fallo(e); } }
+function copiarMun(i){ var x=MUNS[i];
+  var msg='Buenas, Prof. Este es el enlace de carnetización del municipio *'+x.municipio+'*. Por favor compártalo con los directores de su municipio:\n'+x.url+'\n\n'+
+    'Cada director busca su escuela en la lista. La primera vez confirma el tipo de escuela, pone su cédula y crea un PIN de 4 números (que no debe compartir). Luego registra el pago y carga a su personal con foto. Si su escuela no aparece, toca \u00abMi institución no aparece\u00bb.'+
+    (x.contacto?'\n\nPara cualquier duda o error, comuníquese directamente con la '+x.contacto+'.':'');
+  velo('<h2>'+esc(x.municipio)+'</h2><textarea rows="9" id="mMsg">'+esc(msg)+'</textarea><button class="full" onclick="$(\'mMsg\').select();document.execCommand(\'copy\')">Copiar mensaje</button><button class="sec full" style="margin-top:8px" onclick="cerrarVelo()">Cerrar</button>'); }
+async function quitarPin(cod){ if(!confirm('¿Permitir que el director de '+cod+' cree un PIN nuevo? Si tenía uno, deja de servir.')) return; cargando(); try{ await srv('borrarPin',K,cod); D=await srv('panel',K); pintar(); cerrarVelo(); }catch(e){ fallo(e); } }
+function formEnlace(cod){
+  var e = D.escuelas.filter(function(x){return x[0]===cod;})[0];
+  velo('<h2>'+esc(e[2])+'</h2><div class="muted">'+esc(e[1])+' · '+esc(cod)+'</div>'+
+    '<label>Nombre como sale en el carnet</label><input id="eC" value="'+esc(e[3]||e[2])+'">'+
+    '<label>Tipo de escuela</label><select id="eN"><option>NACIONAL</option><option>ESTADAL</option><option>MUNICIPAL</option><option>SUBVENCIONADA</option><option>PRIVADA</option><option>AUTÓNOMA</option></select>'+
+    (e[9]==='SÍ'?'<div class="aviso">Esta escuela tiene PIN. Lo creó la cédula <b>'+esc(String(e[10]||'').replace(/^'/,''))+'</b>. Si el director dice que no fue él: <button class="sec" onclick="quitarPin(\''+esc(cod)+'\')">Borrar PIN</button></div>':
+     e[9]==='LIBRE'?'<div class="bien">El director puede crear su PIN entrando por el enlace del municipio.</div>':
+     e[7]?'<div class="muted">Esta escuela tiene su propio enlace. Si quiere que el director entre también por el enlace del municipio: <button class="sec" onclick="quitarPin(\''+esc(cod)+'\')">Permitir crear PIN</button></div>':'')+
+    '<label>Director(a)</label><input id="eD" value="'+esc(e[5]||'')+'"><label>Teléfono</label><input id="eT" value="'+esc(e[6]||'')+'">'+
+    '<div id="eR"></div><div class="fila" style="margin-top:12px"><button class="sec" onclick="cerrarVelo()">Cerrar</button><button onclick="crearEnlace(\''+esc(cod)+'\')">Guardar y ver enlace</button></div>');
+  var t=String(e[4]||'').toUpperCase().trim(); $('eN').value = ['NACIONAL','ESTADAL','MUNICIPAL','SUBVENCIONADA','PRIVADA','AUTÓNOMA'].indexOf(t)>=0 ? t : (/ESTADAL/i.test(e[2])?'ESTADAL':'NACIONAL');
+}
+async function crearEnlace(cod){
+  try{
+    var r = await srv('crearEnlace', K, {codigo:cod, corto:$('eC').value, nacEst:$('eN').value, director:$('eD').value, tel:$('eT').value});
+    var msg = 'Buenas, Director(a). Este es el enlace de carnetización de *'+r.nombre+'*:\n'+r.url+'\n\n'+
+      '1. Pague el total: '+bs(D.precioHoy)+' Bs por carnet'+(D.precios&&D.precios.desde&&D.precios.base!==D.precios.nuevo?' (las transferencias hechas antes del '+D.precios.desde.split('-').reverse().join('/')+' valen '+bs(D.precios.base)+' Bs por carnet)':'')+'.\n2. Registre el pago en el enlace con el capture. Si pagó en varias transferencias, regístrelas todas juntas.\n3. Cargue a cada persona con su foto (de frente, pared clara) y revise cómo queda su carnet.\n4. Cuando estén todos, pulse «Terminar y enviar».\n\nLos pagos se confirman todos los días después de la 1:00 p. m.';
+    $('eR').innerHTML='<div class="bien">Enlace listo. Copie este mensaje para WhatsApp:</div><textarea rows="9" id="eMsg">'+esc(msg)+'</textarea><button class="full" onclick="$(\'eMsg\').select();document.execCommand(\'copy\')">Copiar mensaje</button>';
+    D = await srv('panel', K);
+  }catch(e){ $('eR').innerHTML='<div class="err">'+esc(e)+'</div>'; }
+}
+function salir(){ try{ localStorage.removeItem('panel_k'); }catch(e){} location.href = location.pathname + '?salio=1'; }
+arrancar();
+</script>
+</body></html>
