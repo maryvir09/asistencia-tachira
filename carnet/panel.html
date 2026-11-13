@@ -231,20 +231,12 @@ function bajar(i){ var a=document.createElement('a'); a.href=PARTES[i][0]; a.dow
 var FILTRO='';
 function vEnlaces(){
   var f = FILTRO.toUpperCase(), lista = D.escuelas.filter(function(e){ return !f || (e[0]+' '+e[1]+' '+e[2]+' '+e[3]).toUpperCase().indexOf(f)>=0; }).slice(0,40);
-  return '<div class="card"><h2>Enlaces por municipio (para los jefes de centro)</h2><p class="muted">Un enlace por municipio. El jefe de centro lo reparte a sus directores; cada director busca su escuela y entra con su PIN.</p>'+
-    (MUNS?'<table><tr><th>Municipio</th><th></th></tr>'+MUNS.map(function(x,i){return '<tr><td>'+esc(x.municipio)+'</td><td>'+(x.url?'<button class="sec" onclick="copiarMun('+i+')">Copiar mensaje</button>':'<small class="muted">sin clave</small>')+'</td></tr>';}).join('')+'</table>':'<button class="sec" onclick="verMuns()">Ver los enlaces de los municipios</button>')+'</div>'+
+  return '<div class="card"><h2>Mensajes para los jefes de centro</h2><p class="muted">Se envían desde la página <b>ENVIAR_A_JEFES_DE_CENTRO</b> (en su computadora: Escritorio › CARNETIZACION TACHIRA), con un botón de WhatsApp por municipio. Aquí no se envían.</p></div>'+
     '<div class="card"><h2>Crear enlace para una escuela</h2><input id="fil" placeholder="Busque por nombre, municipio o código" value="'+esc(FILTRO)+'" oninput="FILTRO=this.value;var p=this.selectionStart;pintar();$(\'fil\').focus();$(\'fil\').setSelectionRange(p,p)">'+
     '<table><tr><th>Código</th><th>Escuela</th><th>Estado</th><th></th></tr>'+lista.map(function(e){
       return '<tr><td>'+esc(e[0])+'</td><td>'+esc(e[2])+'<br><small class="muted">'+esc(e[1])+'</small></td><td>'+esc(e[8])+(e[7]?' · <b>con enlace</b>':'')+(e[9]==='SÍ'?' · <b>con PIN</b>':'')+'</td><td><button class="sec" onclick="formEnlace(\''+esc(e[0])+'\')">'+(e[7]?'Ver enlace':'Crear')+'</button></td></tr>';
     }).join('')+'</table></div>';
 }
-var MUNS=null;
-async function verMuns(){ cargando('Buscando enlaces…'); try{ MUNS=await srv('enlacesMunicipios',K); pintar(); cerrarVelo(); }catch(e){ fallo(e); } }
-function copiarMun(i){ var x=MUNS[i];
-  var msg='Buenas, Prof. Este es el enlace de carnetización del municipio *'+x.municipio+'*. Por favor compártalo con los directores de su municipio:\n'+x.url+'\n\n'+
-    'Cada director busca su escuela en la lista. La primera vez confirma el tipo de escuela, pone su cédula y crea un PIN de 4 números (que no debe compartir). Luego registra el pago y carga a su personal con foto. Si su escuela no aparece, toca \u00abMi institución no aparece\u00bb.'+
-    (x.contacto?'\n\nPara cualquier duda o error, comuníquese directamente con la '+x.contacto+'.':'');
-  velo('<h2>'+esc(x.municipio)+'</h2><textarea rows="9" id="mMsg">'+esc(msg)+'</textarea><button class="full" onclick="$(\'mMsg\').select();document.execCommand(\'copy\')">Copiar mensaje</button><button class="sec full" style="margin-top:8px" onclick="cerrarVelo()">Cerrar</button>'); }
 async function quitarPin(cod){ if(!confirm('¿Permitir que el director de '+cod+' cree un PIN nuevo? Si tenía uno, deja de servir.')) return; cargando(); try{ await srv('borrarPin',K,cod); D=await srv('panel',K); pintar(); cerrarVelo(); }catch(e){ fallo(e); } }
 function formEnlace(cod){
   var e = D.escuelas.filter(function(x){return x[0]===cod;})[0];
