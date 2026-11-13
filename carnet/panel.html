@@ -79,10 +79,16 @@ function fallo(m){velo('<h2>No se pudo</h2><div class="err">'+esc(m)+'</div><but
 async function arrancar(){ if (!K) { $('hSub').textContent=''; $('app').innerHTML='<div class="card"><div class="err">Falta la clave del panel. Abra el enlace completo que le dio la coordinación (está en el archivo ENLACES_PANEL_PRIVADO).</div></div>'; return; } try{ D = await srv('panel', K); pintar(); }catch(e){ if (/incorrecta/.test(String(e))) { try{ localStorage.removeItem('panel_k'); }catch(x){} e = String(e) + ' Abra el enlace completo que le dio la coordinación (está en el archivo ENLACES_PANEL_PRIVADO).'; } $('app').innerHTML='<div class="card"><div class="err">'+esc(e)+'</div></div>'; } }
 function set(d){ D=d; pintar(); }
 
+// Doble precio (Virginia 13-11): cómo está la fila de Config y cuántos carnets van a cada precio.
+function textoDoble(){
+  var P=D.precios||{}, c=D.doblePrecio||{c6:0,c5:0,pagos:0}; if(!P.desde || P.base===P.nuevo) return '';
+  var est = !P.doble ? 'solo '+bs(P.nuevo)+' Bs' : 'se aceptan '+bs(P.nuevo)+' y '+bs(P.base)+' Bs '+(P.doble==='9999-12-31'?'(sin fecha)':'(hasta el '+P.doble.split('-').reverse().join('/')+')');
+  return ' · Precio: '+est+' · Desde el '+P.desde.split('-').reverse().join('/')+': '+c.c6+' carnet(s) a '+bs(P.nuevo)+' y '+c.c5+' a '+bs(P.base)+' ('+c.pagos+' pago(s))';
+}
 function pintar(){
   var term = D.lotes.filter(function(l){return l.estado==='TERMINADO' && mio(l.municipio);}).length;
   var nAl = D.alertas.filter(function(a){return mio(a.municipio);}).length;
-  $('hSub').textContent = 'Hola, ' + D.usuario + ' · Última carga del estado de cuenta: ' + (D.ultimaCarga || 'nunca');
+  $('hSub').textContent = 'Hola, ' + D.usuario + ' · Última carga del estado de cuenta: ' + (D.ultimaCarga || 'nunca') + textoDoble();
   var nP = {}; D.pagos.forEach(function(p){ nP[p.lote||p.id]=1; });
   var t=[['pagos','Pagos en espera ('+Object.keys(nP).length+')'],['banco','Cargar estado de cuenta'],['alertas','Alertas ('+nAl+')'],['lotes','Para revisar ('+term+')'],['enlaces','Enlaces de escuelas']];
   var filtro = D.misMunicipios.length ? '<label style="display:flex;gap:6px;align-items:center;font-weight:500;margin:0 0 0 6px"><input type="checkbox" style="width:auto" '+(MIOS?'checked':'')+' onchange="MIOS=this.checked;pintar()"> Solo mis municipios</label>' : '';
