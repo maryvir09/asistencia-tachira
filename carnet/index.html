@@ -90,6 +90,7 @@ async function arrancar(){
     await Promise.all(fondos.concat([letras]));
   }catch(e){ $('app').innerHTML='<div class="card"><div class="err">No se pudieron cargar los diseños del carnet. Revise su internet.</div><button class="full" onclick="location.reload()">Intentar de nuevo</button></div>'; return; }
   pintar();
+  cargarHechos();
 }
 function refrescar(d){ if(d && d.escuela){ D=d; } pintar(); }
 
@@ -106,8 +107,28 @@ function pintar(){
        'Pague solo cuando tenga los datos y la foto de <b>todas</b> las personas del grupo.</p>' +
        '<button class="full" onclick="formPago()">Registrar un pago nuevo</button></div>';
   D.lotes.filter(function(l){return l.tipo!=='CORRECCION' && l.estado!=='ANULADO';}).reverse().forEach(function(l){ h += tarjetaLote(l); });
+  h += tarjetaHechos();
   h += tarjetaContacto();
   $('app').innerHTML = h;
+}
+// ---------------------------------------------------------------- carnets ya hechos (solo ver) — 15-11
+// Los carnets que la escuela ya recibió (hechos por link). Solo se ven: no se pueden cambiar ni borrar.
+var HECHOS = null;
+async function cargarHechos(){ try{ HECHOS = await srv('carnetsHechos', PARAMS.e, PARAMS.k); }catch(e){ HECHOS = []; } if (ESTADO.vista === 'inicio') pintar(); }
+function tarjetaHechos(){
+  if (!HECHOS || !HECHOS.length) return '';
+  var h = '<div class="card"><h2>Carnets ya hechos ('+HECHOS.length+')</h2><p class="muted">Son los carnets que su escuela ya recibió. <b>Solo para ver</b>: aquí no se pueden cambiar. Si encuentra un error, comuníquese con la coordinación (contacto al final de la página).</p>';
+  HECHOS.forEach(function(c, i){ h += '<div class="persona"><div><b>'+esc(c.nombre)+'</b><small>'+esc('C.I. '+c.cedula+(c.cargo ? ' · '+c.cargo : ''))+'</small></div><button class="sec" onclick="verHecho('+i+')">Ver</button></div>'; });
+  return h + '</div>';
+}
+async function verHecho(i){
+  var c = HECHOS[i]; if (!c) return;
+  velo('<h2>'+esc(c.nombre)+'</h2><div class="muted">Cargando el carnet…</div>');
+  try{ var src = await srv('carnetHecho', PARAMS.e, PARAMS.k, c.id);
+    if (!/^data:image\/jpeg;base64,/.test(src)) throw new Error('Carnet no disponible');
+    if ($('velo').classList.contains('oculto')) return;   // la persona ya cerró la ventana mientras cargaba
+    velo('<h2>'+esc(c.nombre)+'</h2><img src="'+esc(src)+'" alt="Carnet" style="display:block;max-width:100%;max-height:70vh;margin:0 auto;border-radius:8px"><button class="full" style="margin-top:10px" onclick="cerrarVelo()">Cerrar</button>');
+  }catch(e){ velo('<div class="err">'+esc(e)+'</div><button class="full" onclick="cerrarVelo()">Cerrar</button>'); }
 }
 function tarjetaContacto(){
   var c = String(D.contacto||'').trim(); if (!c) return '';
