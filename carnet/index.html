@@ -163,10 +163,11 @@ function tarjetaLote(l){
   if (l.estado==='PAGO EN ESPERA' && !porReemplazar.length) h += '<div class="aviso">El pago se confirma cuando la coordinación carga el estado de cuenta (todos los días después de la 1:00 p. m.'+(D.ultimaCarga?'; última carga: '+esc(D.ultimaCarga):'')+'). Mientras tanto ya puede cargar a su personal.</div>';
   if (l.estado==='PAGO RECHAZADO') { var rj=(l.pagos||[]).filter(function(t){return t.estado==='RECHAZADO';})[0]; h += '<div class="err">La coordinación no encontró este pago'+(rj?' (ref. …'+esc(String(rj.ref).slice(-6))+')':'')+'. '+esc(rj&&rj.nota||'')+' Registre el pago de nuevo con los datos correctos.</div>'; }
   h += '<div class="barra" style="margin:10px 0"><i style="width:'+Math.round(100*ps.length/l.cupos)+'%"></i></div><div class="muted">'+ps.length+' de '+l.cupos+' cargados</div>';
+  if (abierto && ps.length > l.cupos) h += '<div class="aviso">Hay <b>'+(ps.length-l.cupos)+' persona'+(ps.length-l.cupos>1?'s':'')+' de más</b>: este grupo tiene '+l.cupos+' carnets pagados y '+ps.length+' personas. Quite con «No trabaja aquí» a quien no trabaje en su escuela, o comuníquese con la coordinación para pagar los que faltan.</div>';   // 16-11
   ps.forEach(function(p){   // los grupos enviados se ven pero no se editan (Virginia 13-11: los datos son responsabilidad de la escuela)
     var est = p.estado==='POR APROBAR' ? '<span class="chip warn">Esperando aprobación</span>' : '';
     h += '<div class="persona"><div><b>'+esc(p.nombres+' '+p.apellidos)+'</b><small>'+esc(p.nac+'-'+p.cedula+' · '+p.cargo)+'</small> '+est+'</div>' +
-         (abierto ? '<div class="fila"><button class="sec" onclick="editar('+p.fila+')">Ver / editar</button></div>' : '<button class="sec" onclick="verCarnet('+p.fila+')">Ver</button>') + '</div>';
+         (abierto ? '<div class="fila"><button class="sec" onclick="editar('+p.fila+')">Ver / editar</button><button class="sec" onclick="quitar('+p.fila+')">No trabaja aquí</button></div>' : '<button class="sec" onclick="verCarnet('+p.fila+')">Ver</button>') + '</div>';
   });
   if (abierto) h += avisoRechazados(l, 'Corrija lo indicado y cárguela de nuevo con «Agregar persona» en este mismo grupo.');
   if (abierto && ps.length < l.cupos) h += '<button class="full" style="margin-top:10px" onclick="nueva(\''+l.lote+'\')">+ Agregar persona ('+(l.cupos-ps.length)+' cupo'+(l.cupos-ps.length>1?'s':'')+' libre'+(l.cupos-ps.length>1?'s':'')+')</button>';
@@ -482,6 +483,17 @@ async function guardar(){
   catch(e){ cerrarVelo(); err(e); }
 }
 function volver(){ ESTADO.vista='inicio'; P=null; pintar(); window.scrollTo(0,0); }
+
+// ---------------------------------------------------------------- quitar persona (16-11, pedido de Virginia: la escuela saca a quien no trabaja ahí)
+function quitar(fila){
+  var p = D.personas.filter(function(x){ return x.fila===fila; })[0]; if (!p) return;
+  velo('<h2>Quitar persona</h2><p>¿<b>'+esc(p.nombres+' '+p.apellidos)+'</b> (C.I. '+esc(p.cedula)+') <b>no trabaja</b> en su escuela?</p><p class="muted">Se quitará de este grupo y no se le hará carnet.</p><div class="fila" style="margin-top:12px"><button class="sec" onclick="cerrarVelo()">Cancelar</button><button class="ok" onclick="confirmarQuitar('+fila+')">Sí, quitarla</button></div>');
+}
+async function confirmarQuitar(fila){
+  cargando('Quitando…');
+  try{ refrescar(await srv('borrarPersona', PARAMS.e, PARAMS.k, fila)); cerrarVelo(); }
+  catch(e){ fallo(e); }
+}
 
 // ---------------------------------------------------------------- terminar
 function terminar(lote){
