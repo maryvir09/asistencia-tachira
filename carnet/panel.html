@@ -219,15 +219,22 @@ function waImprenta(lote){
   var nombre = (l.municipio||'')+' - '+(e?(e[3]||e[2]):l.escuela)+' - '+l.cargados+' carnets'+(l.tipo==='CORRECCION'?' - CORRECCION':'');
   window.open('https://wa.me/?text='+encodeURIComponent(msgImprenta(nombre, l.pdf.split('\n'))), '_blank', 'noopener');
 }
-// En la ventana «PDF listo»: si el equipo puede compartir archivos, se abre «Compartir» con el PDF adjunto;
-// si no, WhatsApp con el mensaje y el enlace de Drive.
+// En la ventana «PDF listo» (17-11, Virginia usa WhatsApp instalado en la PC): si el equipo puede compartir archivos, se abre
+// «Compartir» con el PDF adjunto. Si no: el PDF se descarga solo, se abre WhatsApp (la aplicación) con el mensaje escrito y
+// sale el recordatorio de cómo adjuntarlo. Ella escoge el grupo de imprenta.
 async function enviarPdfListo(){
-  var base = PARTES[0][1].replace(/( - parte \d+ de \d+)?\.pdf$/,''), urls = window.LINKS_PDF||[];
+  var base = PARTES[0][1].replace(/( - parte \d+ de \d+)?\.pdf$/,'');
   try{
     var files = PARTES.map(function(x){ var b=atob(x[0].split(',')[1]), u=new Uint8Array(b.length); for(var i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return new File([u], x[1], {type:'application/pdf'}); });
-    if (navigator.canShare && navigator.canShare({files:files})) { await navigator.share({files:files, text:msgImprenta(base, urls)}); return; }
+    if (navigator.canShare && navigator.canShare({files:files})) { await navigator.share({files:files, text:saludoHora()+'. PDF listo para imprimir: '+base}); return; }
   }catch(e){ if (e && e.name==='AbortError') return; }
-  window.open('https://wa.me/?text='+encodeURIComponent(msgImprenta(base, urls)), '_blank', 'noopener');
+  PARTES.forEach(function(x,i){ setTimeout(function(){ bajar(i); }, i*600); });
+  var txt = saludoHora()+'. PDF listo para imprimir: '+base;
+  setTimeout(function(){ location.href = 'whatsapp://send?text='+encodeURIComponent(txt); }, PARTES.length*600+400);
+  velo('<h2>Enviar a imprenta</h2><div class="bien">'+(PARTES.length>1?'Se descargaron los '+PARTES.length+' PDF':'Se descargó el PDF')+' en su carpeta <b>Descargas</b> y se está abriendo WhatsApp con el mensaje.</div>'+
+    '<ol style="font-size:17px;line-height:1.6"><li>En WhatsApp, elija el <b>grupo de imprenta</b>.</li><li>Toque el clip <b>📎</b> › <b>Documento</b>.</li><li>Elija <b>'+PARTES.map(function(x){return esc(x[1]);}).join('</b> y <b>')+'</b> (sale de primero en Descargas) y envíe.</li></ol>'+
+    '<p class="muted">¿No se abrió WhatsApp? <a href="https://wa.me/?text='+encodeURIComponent(txt)+'" target="_blank" rel="noopener">Toque aquí</a>.</p>'+
+    '<button class="full" style="margin-top:8px" onclick="cerrarVelo()">Listo</button>');
 }
 async function impreso(lote){ if(!confirm('¿Confirma que este grupo ya se mandó a imprenta?')) return; cargando(); try{ set(await srv('marcarImpreso',K,lote)); cerrarVelo(); }catch(e){ fallo(e); } }
 
