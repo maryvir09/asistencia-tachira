@@ -144,14 +144,14 @@ function vAlertas(){
       '<div class="muted">Cédula '+esc(a.cedula)+' · Escuela '+esc(a.escuela)+' ('+esc(a.municipio)+') · '+esc(a.fecha)+'</div><div class="aviso">'+esc(a.detalle)+'</div>'+
       (a.tel?'<div class="muted">Director(a): '+esc(a.tel)+'</div>':'')+
       (/^[\w-]+$/.test(a.foto||'')?'<button class="sec" style="margin-top:8px" onclick="verFoto(\''+a.foto+'\')">Ver foto</button>':'')+
-      (['PIN NUEVO','ESCUELA BLOQUEADA','ESCUELA NUEVA'].indexOf(a.tipo)>=0
-        ? '<div class="fila" style="margin-top:8px"><button class="sec" onclick="FILTRO=\''+esc(a.escuela)+'\';TAB=\'enlaces\';pintar()">Ver la escuela</button><button class="ok" onclick="alerta('+a.fila+',true)">Ya lo revisé</button></div></div>'
-        : '<div class="fila" style="margin-top:8px"><button class="ok" onclick="alerta('+a.fila+',true)">Aprobar</button><button class="peligro" onclick="alerta('+a.fila+',false)">Rechazar</button></div></div>');
+      (['PIN NUEVO','ESCUELA BLOQUEADA','ESCUELA NUEVA','QUITADA POR LA ESCUELA'].indexOf(a.tipo)>=0
+        ? '<div class="fila" style="margin-top:8px"><button class="sec" onclick="FILTRO=\''+esc(a.escuela)+'\';TAB=\'enlaces\';pintar()">Ver la escuela</button>'+botonWA(a)+'<button class="ok" onclick="alerta('+a.fila+',true)">Ya lo revisé</button></div></div>'
+        : '<div class="fila" style="margin-top:8px">'+botonWA(a)+'<button class="ok" onclick="alerta('+a.fila+',true)">Aprobar</button><button class="peligro" onclick="alerta('+a.fila+',false)">Rechazar</button></div></div>');
   }).join('');
 }
 async function alerta(f, ok){
   var nota = ok ? '' : prompt('¿Por qué se rechaza? (lo verá la escuela)'); if(!ok && nota===null) return;
-  var a = D.alertas.filter(function(x){return x.fila===f;})[0] || {}, aviso = ['PIN NUEVO','ESCUELA BLOQUEADA','ESCUELA NUEVA'].indexOf(a.tipo)>=0;
+  var a = D.alertas.filter(function(x){return x.fila===f;})[0] || {}, aviso = ['PIN NUEVO','ESCUELA BLOQUEADA','ESCUELA NUEVA','QUITADA POR LA ESCUELA'].indexOf(a.tipo)>=0;
   var d; cargando(); try{ d = await srv('resolverAlerta',K,f,ok,nota); set(d); }catch(e){ return fallo(e); }
   if (aviso) return cerrarVelo();   // avisos del sistema: no hay nada que decirle al director
   // Avisar solo lo que de verdad pasó (la persona puede tener otra alerta pendiente o ya estar anulada).
@@ -174,6 +174,14 @@ function waUrl(tel, msg){
   return d.length===10 && d[0]==='4' ? 'https://wa.me/58'+d+'?text='+encodeURIComponent(msg) : '';   // solo celular
 }
 var TELWA = '';
+// 17-11 (pedido de Virginia): botón «Enviar por WhatsApp» en cada alerta, sin copiar y pegar. Abre el mensaje para revisarlo antes.
+function botonWA(a){ return '<button class="sec" onclick="escribirWA('+a.fila+')">Enviar por WhatsApp</button>'; }
+function escribirWA(f){
+  var a = D.alertas.filter(function(x){return x.fila===f;})[0]; if(!a) return;
+  ofrecerWA(a.escuela, a.tel, a.tipo==='QUITADA POR LA ESCUELA'
+    ? 'su escuela quitó a '+a.persona+' (cédula '+a.cedula+') con «No trabaja aquí». Si fue un error, avísenos por este medio.'
+    : 'tenemos una observación sobre '+a.persona+' (cédula '+a.cedula+'): '+a.detalle+'. Entre a su enlace de carnetización para revisarlo.');
+}
 function ofrecerWA(cod, tel, cuerpo){
   TELWA = waUrl(telEscuela(cod),'x') ? telEscuela(cod) : tel;   // primero el de la hoja Escuelas (el más al día)
   var msg = 'Saludos. Le escribe la coordinación de carnetización del Táchira. Le informamos que '+cuerpo+'\n— '+(D.usuario||'Coordinación');
@@ -261,7 +269,10 @@ async function crearEnlace(cod){
     var r = await srv('crearEnlace', K, {codigo:cod, corto:$('eC').value, nacEst:$('eN').value, director:$('eD').value, tel:$('eT').value});
     var msg = 'Buenas, Director(a). Este es el enlace de carnetización de *'+r.nombre+'*:\n'+r.url+'\n\n'+
       '1. Pague el total: '+bs(D.precioHoy)+' Bs por carnet'+(D.precios&&D.precios.desde&&D.precios.base!==D.precios.nuevo?' (las transferencias hechas antes del '+D.precios.desde.split('-').reverse().join('/')+' valen '+bs(D.precios.base)+' Bs por carnet)':'')+'.\n2. Registre el pago en el enlace con el capture. Si pagó en varias transferencias, regístrelas todas juntas.\n3. Cargue a cada persona con su foto (de frente, pared clara) y revise cómo queda su carnet.\n4. Cuando estén todos, pulse «Terminar y enviar».\n\nLos pagos se confirman todos los días después de la 1:00 p. m.';
-    $('eR').innerHTML='<div class="bien">Enlace listo. Copie este mensaje para WhatsApp:</div><textarea rows="9" id="eMsg">'+esc(msg)+'</textarea><button class="full" onclick="$(\'eMsg\').select();document.execCommand(\'copy\')">Copiar mensaje</button>';
+    var waE = waUrl($('eT').value, msg);   // 17-11: enviar directo por WhatsApp al celular del director
+    $('eR').innerHTML='<div class="bien">Enlace listo.</div><textarea rows="9" id="eMsg" oninput="var x=$(\'eWA\'); if(x) x.href=waUrl($(\'eT\').value,this.value)">'+esc(msg)+'</textarea>'+
+      (waE ? '<a id="eWA" class="btn full" style="display:block;text-align:center;text-decoration:none;margin-top:8px" href="'+esc(waE)+'" target="_blank" rel="noopener">Enviar por WhatsApp al director</a>' : '<div class="aviso">Para enviarlo directo por WhatsApp, escriba arriba el celular del director (04XX…) y guarde de nuevo.</div>')+
+      '<button class="sec full" style="margin-top:8px" onclick="$(\'eMsg\').select();document.execCommand(\'copy\')">Copiar mensaje</button>';
     D = await srv('panel', K);
   }catch(e){ $('eR').innerHTML='<div class="err">'+esc(e)+'</div>'; }
 }

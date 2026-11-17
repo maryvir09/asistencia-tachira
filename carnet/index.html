@@ -163,13 +163,18 @@ function tarjetaLote(l){
   if (l.estado==='PAGO EN ESPERA' && !porReemplazar.length) h += '<div class="aviso">El pago se confirma cuando la coordinación carga el estado de cuenta (todos los días después de la 1:00 p. m.'+(D.ultimaCarga?'; última carga: '+esc(D.ultimaCarga):'')+'). Mientras tanto ya puede cargar a su personal.</div>';
   if (l.estado==='PAGO RECHAZADO') { var rj=(l.pagos||[]).filter(function(t){return t.estado==='RECHAZADO';})[0]; h += '<div class="err">La coordinación no encontró este pago'+(rj?' (ref. …'+esc(String(rj.ref).slice(-6))+')':'')+'. '+esc(rj&&rj.nota||'')+' Registre el pago de nuevo con los datos correctos.</div>'; }
   h += '<div class="barra" style="margin:10px 0"><i style="width:'+Math.round(100*ps.length/l.cupos)+'%"></i></div><div class="muted">'+ps.length+' de '+l.cupos+' cargados</div>';
-  if (abierto && ps.length > l.cupos) h += '<div class="aviso">Hay <b>'+(ps.length-l.cupos)+' persona'+(ps.length-l.cupos>1?'s':'')+' de más</b>: este grupo tiene '+l.cupos+' carnets pagados y '+ps.length+' personas. Quite con «No trabaja aquí» a quien no trabaje en su escuela, o comuníquese con la coordinación para pagar los que faltan.</div>';   // 16-11
+  if (abierto && ps.length > l.cupos) h += '<div class="aviso">Hay <b>'+(ps.length-l.cupos)+' persona'+(ps.length-l.cupos>1?'s':'')+' de más</b>: este grupo tiene '+l.cupos+' carnets pagados y '+ps.length+' personas. Quite con «No trabaja aquí» a quien no trabaje en su escuela, o pague los que faltan con el botón «Pagar más carnets para este grupo».</div>';   // 16-11 / 17-11
   ps.forEach(function(p){   // los grupos enviados se ven pero no se editan (Virginia 13-11: los datos son responsabilidad de la escuela)
     var est = p.estado==='POR APROBAR' ? '<span class="chip warn">Esperando aprobación</span>' : '';
-    h += '<div class="persona"><div><b>'+esc(p.nombres+' '+p.apellidos)+'</b><small>'+esc(p.nac+'-'+p.cedula+' · '+p.cargo)+'</small> '+est+'</div>' +
+    var corr = (abierto && p.problema) ? '<div class="aviso" style="margin:6px 0 0;padding:6px 10px">'+esc(p.problema)+'</div>' : '';   // 17-11: lo que el director debe corregir
+    h += '<div class="persona"><div><b>'+esc(p.nombres+' '+p.apellidos)+'</b><small>'+esc(p.nac+'-'+p.cedula+' · '+p.cargo)+'</small> '+est+corr+'</div>' +
          (abierto ? '<div class="fila"><button class="sec" onclick="editar('+p.fila+')">Ver / editar</button><button class="sec" onclick="quitar('+p.fila+')">No trabaja aquí</button></div>' : '<button class="sec" onclick="verCarnet('+p.fila+')">Ver</button>') + '</div>';
   });
   if (abierto) h += avisoRechazados(l, 'Corrija lo indicado y cárguela de nuevo con «Agregar persona» en este mismo grupo.');
+  if (l.tipo!=='CORRECCION' && (abierto || l.estado==='PAGO RECHAZADO')) {   // 17-11: pagar más carnets para este mismo grupo
+    var sug = l.estado==='PAGO RECHAZADO' ? ps.length : Math.max(ps.length - l.cupos, 0);
+    h += '<button class="sec full" style="margin-top:10px" onclick="formPago(\''+esc(l.lote)+'\','+sug+')">'+(l.estado==='PAGO RECHAZADO'?'Pagar este grupo otra vez':'Pagar más carnets para este grupo')+'</button>';
+  }
   if (abierto && ps.length < l.cupos) h += '<button class="full" style="margin-top:10px" onclick="nueva(\''+l.lote+'\')">+ Agregar persona ('+(l.cupos-ps.length)+' cupo'+(l.cupos-ps.length>1?'s':'')+' libre'+(l.cupos-ps.length>1?'s':'')+')</button>';
   if (abierto) {
     var listo = l.estado==='ABIERTO' && ps.length===l.cupos && !ps.some(function(p){return p.estado==='POR APROBAR';});
@@ -235,10 +240,12 @@ function bloque(i){
    '<label>Capture de esta transferencia</label><input id="tK'+i+'" type="file" accept="image/*"><div class="muted">Toque la casilla y elija la foto del capture en su galería.</div>';
   return d;
 }
-function formPago(){
+function formPago(lote, sug){
   var c = D.cuentas.length ? '<div class="muted" style="white-space:pre-line;margin-bottom:6px">'+esc(D.cuentas.join('\n\n'))+'</div>' : '';
-  ESTADO.vista='pago'; NB=0; SUBIDOS={}; window.scrollTo(0,0);
-  $('app').innerHTML=('<div class="card"><div class="fila" style="justify-content:space-between"><h2>Registrar pago</h2><button class="sec" onclick="volver()">← Volver</button></div>'+c+
+  ESTADO.vista='pago'; NB=0; SUBIDOS={}; ESTADO.lotePago = lote || ''; window.scrollTo(0,0);
+  var L = lote ? D.lotes.filter(function(x){return x.lote===lote;})[0] : null;
+  var extra = L ? '<div class="bien">Este pago se suma al <b>grupo de '+L.cupos+' carnet'+(L.cupos>1?'s':'')+'</b> que ya tiene ('+personasDe(lote).length+' personas cargadas). Indique solo los carnets <b>que paga ahora</b>.</div>' : '';
+  $('app').innerHTML=('<div class="card"><div class="fila" style="justify-content:space-between"><h2>'+(L?'Pagar más carnets para este grupo':'Registrar pago')+'</h2><button class="sec" onclick="volver()">← Volver</button></div>'+extra+c+
    '<p class="muted">Precio: <b>'+bs(D.precio)+' Bs por carnet</b>.'+reglaPrecio()+'</p>'+
    '<label>¿Cuántos carnets paga?</label><input id="pCant" type="number" min="1" inputmode="numeric" oninput="resumenPago()">'+
    '<label>¿En cuántas transferencias pagó?</label><input id="pNT" type="number" min="1" max="'+MAXT+'" value="1" inputmode="numeric" oninput="verBloques()">'+
@@ -246,6 +253,7 @@ function formPago(){
    '<div id="tLista"></div>'+
    '<div id="pRes"></div><div id="pErr"></div><button class="full" style="margin-top:14px" onclick="enviarPago()">Registrar pago</button></div>');
   verBloques();
+  if (sug > 0) { $('pCant').value = sug; resumenPago(); }
 }
 function nT(){ var n=Math.floor(+$('pNT').value||1); return Math.max(1, Math.min(MAXT, n)); }
 function verBloques(){
@@ -299,7 +307,7 @@ async function enviarPago(){
   if (Math.abs(valor-cant)>0.001) return err('Lo transferido alcanza para '+(Math.round(valor*100)/100).toLocaleString('es-VE')+' carnet(s) y usted indicó '+cant+'. Revise los montos y las fechas.'+(reglaPrecio()?' Recuerde: '+reglaPrecio().replace(/<[^>]+>/g,''):''));
   velo('<h2>Registrando pago…</h2><div class="barra"><i id="pBar" style="width:5%"></i></div><p class="muted" id="pBarT">Preparando…</p><p class="muted">No cierre esta página.</p>');
   try{
-    var datos={cantidad:cant, transferencias:[]};
+    var datos={cantidad:cant, transferencias:[]}; if (ESTADO.lotePago) datos.lote = ESTADO.lotePago;   // 17-11
     for (var j=0;j<T.length;j++){
       var s = SUBIDOS[T[j].i];
       if (!s || s.file!==T[j].file){
@@ -312,7 +320,7 @@ async function enviarPago(){
       datos.transferencias.push({monto:T[j].monto, fecha:T[j].fecha, referencia:T[j].referencia, banco:T[j].banco, cuenta:T[j].cuenta, captureId:s.id});
     }
     $('pBarT').textContent = 'Registrando…';
-    var r = await srv('registrarPago', PARAMS.e, PARAMS.k, datos); ESTADO.vista='inicio'; SUBIDOS={}; refrescar(r); cerrarVelo(); window.scrollTo(0,0);
+    var r = await srv('registrarPago', PARAMS.e, PARAMS.k, datos); ESTADO.vista='inicio'; ESTADO.lotePago=''; SUBIDOS={}; refrescar(r); cerrarVelo(); window.scrollTo(0,0);
   }catch(e){ cerrarVelo(); err(e); }
 }
 
@@ -482,7 +490,7 @@ async function guardar(){
   try{ var r = await srv('guardarPersona', PARAMS.e, PARAMS.k, d); ESTADO.vista='inicio'; refrescar(r); cerrarVelo(); window.scrollTo(0,0); }
   catch(e){ cerrarVelo(); err(e); }
 }
-function volver(){ ESTADO.vista='inicio'; P=null; pintar(); window.scrollTo(0,0); }
+function volver(){ ESTADO.vista='inicio'; ESTADO.lotePago=''; P=null; pintar(); window.scrollTo(0,0); }
 
 // ---------------------------------------------------------------- quitar persona (16-11, pedido de Virginia: la escuela saca a quien no trabaja ahí)
 function quitar(fila){
