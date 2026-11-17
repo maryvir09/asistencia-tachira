@@ -201,10 +201,16 @@ function vLotes(){
       '<div class="muted">'+esc(l.municipio)+' · Terminado por '+esc(l.quien)+' · '+esc(l.cuando)+(l.revisado?' · PDF: '+esc(l.revisado):'')+'</div>'+
       (l.pdf?'<div style="margin-top:6px">'+l.pdf.split('\n').map(function(u,i){return '<a href="'+esc(u)+'" target="_blank">Abrir PDF guardado'+(l.pdf.indexOf('\n')>=0?' (parte '+(i+1)+')':'')+'</a>';}).join('<br>')+'</div>':'')+
       '<div class="fila" style="margin-top:10px"><button onclick="pdf(\''+l.lote+'\')">'+(l.pdf?'Generar otra vez':'Ver carnets y generar PDF')+'</button>'+
-      (l.pdf?'<button class="ok" onclick="impreso(\''+l.lote+'\')">Marcar como impreso</button>':'')+'</div></div>';
+      (l.pdf?'<button class="ok" onclick="impreso(\''+l.lote+'\')">Marcar como impreso</button>':'')+
+      '<button class="sec" onclick="waLote(\''+esc(l.lote)+'\')">Enviar por WhatsApp</button></div></div>';   // 17-11 (pedido de Virginia)
   }).join('');
   var imp = D.lotes.filter(function(l){return l.estado==='IMPRESO';}).length;
   return h + '<p class="muted">Grupos ya impresos: '+imp+'</p>';
+}
+// 17-11: WhatsApp al director desde «Para revisar». El mensaje se puede corregir antes de mandarlo.
+function waLote(lote){
+  var l = D.lotes.filter(function(x){return x.lote===lote;})[0]; if(!l) return;
+  ofrecerWA(l.escuela, '', 'recibimos el grupo de '+l.cargados+' carnet'+(l.cargados==1?'':'s')+' de su institución y lo estamos revisando. Le avisaremos por este medio cuando esté listo o si hay algo que corregir.');
 }
 async function impreso(lote){ if(!confirm('¿Confirma que este grupo ya se mandó a imprenta?')) return; cargando(); try{ set(await srv('marcarImpreso',K,lote)); cerrarVelo(); }catch(e){ fallo(e); } }
 
