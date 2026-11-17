@@ -202,15 +202,32 @@ function vLotes(){
       (l.pdf?'<div style="margin-top:6px">'+l.pdf.split('\n').map(function(u,i){return '<a href="'+esc(u)+'" target="_blank">Abrir PDF guardado'+(l.pdf.indexOf('\n')>=0?' (parte '+(i+1)+')':'')+'</a>';}).join('<br>')+'</div>':'')+
       '<div class="fila" style="margin-top:10px"><button onclick="pdf(\''+l.lote+'\')">'+(l.pdf?'Generar otra vez':'Ver carnets y generar PDF')+'</button>'+
       (l.pdf?'<button class="ok" onclick="impreso(\''+l.lote+'\')">Marcar como impreso</button>':'')+
-      '<button class="sec" onclick="waLote(\''+esc(l.lote)+'\')">Enviar por WhatsApp</button></div></div>';   // 17-11 (pedido de Virginia)
+      (l.pdf?'<button class="sec" onclick="waImprenta(\''+esc(l.lote)+'\')">Enviar por WhatsApp</button>':'')+'</div></div>';   // 17-11: al grupo de imprenta
   }).join('');
   var imp = D.lotes.filter(function(l){return l.estado==='IMPRESO';}).length;
   return h + '<p class="muted">Grupos ya impresos: '+imp+'</p>';
 }
-// 17-11: WhatsApp al director desde «Para revisar». El mensaje se puede corregir antes de mandarlo.
-function waLote(lote){
-  var l = D.lotes.filter(function(x){return x.lote===lote;})[0]; if(!l) return;
-  ofrecerWA(l.escuela, '', 'recibimos el grupo de '+l.cargados+' carnet'+(l.cargados==1?'':'s')+' de su institución y lo estamos revisando. Le avisaremos por este medio cuando esté listo o si hay algo que corregir.');
+// 17-11 (pedido de Virginia): PDF listo → botón «Enviar por WhatsApp». Abre WhatsApp con el mensaje listo (escuela, carnets
+// y enlace del PDF en Drive) y ella escoge el grupo de imprenta. No va a ningún número fijo.
+function saludoHora(){ var h=new Date().getHours(); return h<12?'Buenos días':(h<19?'Buenas tardes':'Buenas noches'); }
+function msgImprenta(nombre, urls){
+  return saludoHora()+'. PDF listo para imprimir:\n'+nombre+'\n'+urls.map(function(u,i){return (urls.length>1?'Parte '+(i+1)+': ':'')+u;}).join('\n');
+}
+function waImprenta(lote){
+  var l = D.lotes.filter(function(x){return x.lote===lote;})[0]; if(!l || !l.pdf) return;
+  var e = (D.escuelas||[]).filter(function(x){return x[0]===l.escuela;})[0];
+  var nombre = (l.municipio||'')+' - '+(e?(e[3]||e[2]):l.escuela)+' - '+l.cargados+' carnets'+(l.tipo==='CORRECCION'?' - CORRECCION':'');
+  window.open('https://wa.me/?text='+encodeURIComponent(msgImprenta(nombre, l.pdf.split('\n'))), '_blank', 'noopener');
+}
+// En la ventana «PDF listo»: si el equipo puede compartir archivos, se abre «Compartir» con el PDF adjunto;
+// si no, WhatsApp con el mensaje y el enlace de Drive.
+async function enviarPdfListo(){
+  var base = PARTES[0][1].replace(/( - parte \d+ de \d+)?\.pdf$/,''), urls = window.LINKS_PDF||[];
+  try{
+    var files = PARTES.map(function(x){ var b=atob(x[0].split(',')[1]), u=new Uint8Array(b.length); for(var i=0;i<b.length;i++) u[i]=b.charCodeAt(i); return new File([u], x[1], {type:'application/pdf'}); });
+    if (navigator.canShare && navigator.canShare({files:files})) { await navigator.share({files:files, text:msgImprenta(base, urls)}); return; }
+  }catch(e){ if (e && e.name==='AbortError') return; }
+  window.open('https://wa.me/?text='+encodeURIComponent(msgImprenta(base, urls)), '_blank', 'noopener');
 }
 async function impreso(lote){ if(!confirm('¿Confirma que este grupo ya se mandó a imprenta?')) return; cargando(); try{ set(await srv('marcarImpreso',K,lote)); cerrarVelo(); }catch(e){ fallo(e); } }
 
@@ -242,8 +259,9 @@ async function pdf(lote){
       $('barT').textContent='Guardando en Drive '+(j+1)+' de '+partes.length+'…';
       links.push(await srv('guardarPdf', K, lote, partes[j], nom, j+1)); PARTES.push([partes[j],nom]);
     }
-    D = await srv('panel', K); pintar();
-    velo('<h2>PDF listo</h2><div class="bien">Quedó guardado en la carpeta «PDF PARA IMPRENTA».</div>'+PARTES.map(function(x,i){return '<button class="full" style="margin:6px 0" onclick="bajar('+i+')">Descargar '+esc(x[1])+'</button>';}).join('')+'<p class="muted">Revise cada carnet antes de mandarlo a la imprenta:</p><div class="fila" style="align-items:flex-start">'+thumbs.join('')+'</div><button class="full" style="margin-top:12px" onclick="cerrarVelo()">Cerrar</button>');
+    D = await srv('panel', K); pintar(); window.LINKS_PDF = links;
+    velo('<h2>PDF listo</h2><div class="bien">Quedó guardado en la carpeta «PDF PARA IMPRENTA».</div>'+
+      '<button class="ok full" style="margin:6px 0" onclick="enviarPdfListo()">Enviar por WhatsApp</button>'+PARTES.map(function(x,i){return '<button class="full" style="margin:6px 0" onclick="bajar('+i+')">Descargar '+esc(x[1])+'</button>';}).join('')+'<p class="muted">Revise cada carnet antes de mandarlo a la imprenta:</p><div class="fila" style="align-items:flex-start">'+thumbs.join('')+'</div><button class="full" style="margin-top:12px" onclick="cerrarVelo()">Cerrar</button>');
   }catch(e){ fallo(e); }
 }
 
