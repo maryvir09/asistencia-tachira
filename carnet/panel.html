@@ -144,14 +144,16 @@ function vAlertas(){
       '<div class="muted">Cédula '+esc(a.cedula)+' · Escuela '+esc(a.escuela)+' ('+esc(a.municipio)+') · '+esc(a.fecha)+'</div><div class="aviso">'+esc(a.detalle)+'</div>'+
       (a.tel?'<div class="muted">Director(a): '+esc(a.tel)+'</div>':'')+
       (/^[\w-]+$/.test(a.foto||'')?'<button class="sec" style="margin-top:8px" onclick="verFoto(\''+a.foto+'\')">Ver foto</button>':'')+
-      (['PIN NUEVO','ESCUELA BLOQUEADA','ESCUELA NUEVA','QUITADA POR LA ESCUELA'].indexOf(a.tipo)>=0
+      (AVISOS.indexOf(a.tipo)>=0
         ? '<div class="fila" style="margin-top:8px"><button class="sec" onclick="FILTRO=\''+esc(a.escuela)+'\';TAB=\'enlaces\';pintar()">Ver la escuela</button>'+botonWA(a)+'<button class="ok" onclick="alerta('+a.fila+',true)">Ya lo revisé</button></div></div>'
         : '<div class="fila" style="margin-top:8px">'+botonWA(a)+'<button class="ok" onclick="alerta('+a.fila+',true)">Aprobar</button><button class="peligro" onclick="alerta('+a.fila+',false)">Rechazar</button></div></div>');
   }).join('');
 }
+// 17-11: avisos que solo se leen («Ya lo revisé»); deben ser los mismos que AVISOS_SISTEMA del servidor.
+var AVISOS = ['PIN NUEVO','ESCUELA BLOQUEADA','ESCUELA NUEVA','QUITADA POR LA ESCUELA','DEVUELTA POR LA ESCUELA','CORRECCIÓN PEDIDA POR LA ESCUELA'];
 async function alerta(f, ok){
   var nota = ok ? '' : prompt('¿Por qué se rechaza? (lo verá la escuela)'); if(!ok && nota===null) return;
-  var a = D.alertas.filter(function(x){return x.fila===f;})[0] || {}, aviso = ['PIN NUEVO','ESCUELA BLOQUEADA','ESCUELA NUEVA','QUITADA POR LA ESCUELA'].indexOf(a.tipo)>=0;
+  var a = D.alertas.filter(function(x){return x.fila===f;})[0] || {}, aviso = AVISOS.indexOf(a.tipo)>=0;
   var d; cargando(); try{ d = await srv('resolverAlerta',K,f,ok,nota); set(d); }catch(e){ return fallo(e); }
   if (aviso) return cerrarVelo();   // avisos del sistema: no hay nada que decirle al director
   // Avisar solo lo que de verdad pasó (la persona puede tener otra alerta pendiente o ya estar anulada).
@@ -180,6 +182,8 @@ function escribirWA(f){
   var a = D.alertas.filter(function(x){return x.fila===f;})[0]; if(!a) return;
   ofrecerWA(a.escuela, a.tel, a.tipo==='QUITADA POR LA ESCUELA'
     ? 'su escuela quitó a '+a.persona+' (cédula '+a.cedula+') con «No trabaja aquí». Si fue un error, avísenos por este medio.'
+    : a.tipo==='DEVUELTA POR LA ESCUELA' ? 'recibimos que '+a.persona+' (cédula '+a.cedula+') sí trabaja en su escuela.'
+    : a.tipo==='CORRECCIÓN PEDIDA POR LA ESCUELA' ? 'recibimos su pedido de corregir el carnet de '+a.persona+' (cédula '+a.cedula+'). Corríjalo en «Correcciones pendientes» de su enlace y pulse «Terminar correcciones y enviar».'
     : 'tenemos una observación sobre '+a.persona+' (cédula '+a.cedula+'): '+a.detalle+'. Entre a su enlace de carnetización para revisarlo.');
 }
 function ofrecerWA(cod, tel, cuerpo){
@@ -243,6 +247,8 @@ async function pdf(lote){
   cargando('Preparando carnets…');
   try{
     var d = await srv('lotePdf', K, lote);
+    if ((d.fotoAnterior||[]).length) return velo('<h2>Este PDF lo arma Claude</h2><div class="aviso">'+d.fotoAnterior.length+' carnet(s) de este grupo usan la foto del carnet anterior ('+esc(d.fotoAnterior.join(', '))+'). '+
+      'El sistema solo tiene una copia chica de esa foto y el carnet saldría borroso. Pídale a Claude el PDF COMPLETO de la escuela: lleva la foto original, con la misma nitidez.</div><button class="full" onclick="cerrarVelo()">Entendido</button>');   // 17-11
     await CARNET.loadFonts(d.assets.fonts);
     var bg={}; for (var g in d.assets.bg) bg[g]=await img(d.assets.bg[g]);
     var inst={corto:d.escuela.corto, oficial:d.escuela.oficial, periodo:d.periodo};

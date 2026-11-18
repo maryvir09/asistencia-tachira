@@ -111,15 +111,48 @@ function pintar(){
   h += tarjetaContacto();
   $('app').innerHTML = h;
 }
-// ---------------------------------------------------------------- carnets ya hechos (solo ver) — 15-11
-// Los carnets que la escuela ya recibió (hechos por link). Solo se ven: no se pueden cambiar ni borrar.
+// ---------------------------------------------------------------- carnets ya hechos — 15-11; 17-11: la escuela los arregla
+// Pedido de Virginia (17-11): la escuela dice quién no trabaja aquí y corrige los errores de sus carnets ya hechos.
 var HECHOS = null;
 async function cargarHechos(){ try{ HECHOS = await srv('carnetsHechos', PARAMS.e, PARAMS.k); }catch(e){ HECHOS = []; } if (ESTADO.vista === 'inicio') pintar(); }
 function tarjetaHechos(){
   if (!HECHOS || !HECHOS.length) return '';
-  var h = '<div class="card"><h2>Carnets ya hechos ('+HECHOS.length+')</h2><p class="muted">Son los carnets que su escuela ya recibió. <b>Solo para ver</b>: aquí no se pueden cambiar. Si encuentra un error, comuníquese con la coordinación (contacto al final de la página).</p>';
-  HECHOS.forEach(function(c, i){ h += '<div class="persona"><div><b>'+esc(c.nombre)+'</b><small>'+esc('C.I. '+c.cedula+(c.cargo ? ' · '+c.cargo : ''))+'</small></div><button class="sec" onclick="verHecho('+i+')">Ver</button></div>'; });
+  var h = '<div class="card"><h2>Carnets ya hechos ('+HECHOS.length+')</h2><p class="muted">Son los carnets que su escuela ya tiene. Revise cada uno. '+
+          'Si alguien <b>no trabaja</b> en su escuela, pulse «No trabaja aquí». Si un carnet tiene un <b>error</b>, pulse «Corregir»: '+
+          'le aparecerá arriba, en «Correcciones pendientes», para que lo arregle y lo envíe.</p>';
+  HECHOS.forEach(function(c, i){
+    var bot = '<button class="sec" onclick="verHecho('+i+')">Ver</button>', chip = '';
+    if (c.quitada) { chip = ' <span class="chip bad">No trabaja aquí</span>'; bot += '<button class="sec" onclick="devolverHecho('+i+')">Sí trabaja aquí</button>'; }
+    else if (c.correccion && c.correccion !== 'ENVIADA') chip = ' <span class="chip warn">En corrección (arriba)</span>';
+    else {   // revisión 17-11: «No trabaja aquí» se puede usar siempre; «Corregir», salvo mientras la coordinación revisa la corrección enviada
+      if (c.correccion === 'ENVIADA') chip = ' <span class="chip ok">'+(c.enRevision ? 'Corrección en revisión' : 'Corrección enviada')+'</span>';
+      if (!c.enRevision) bot += '<button class="sec" onclick="corregirHecho('+i+')">Corregir</button>';
+      bot += '<button class="sec" onclick="quitarHecho('+i+')">No trabaja aquí</button>';
+    }
+    h += '<div class="persona"><div><b>'+esc(c.nombre)+'</b><small>'+esc('C.I. '+c.cedula+(c.cargo ? ' · '+c.cargo : ''))+'</small>'+chip+'</div><div class="fila">'+bot+'</div></div>';
+  });
   return h + '</div>';
+}
+function respHechos(r){ if (r && r.hechos) HECHOS = r.hechos; refrescar(r && r.inicio); }
+function quitarHecho(i){
+  var c = HECHOS[i]; if (!c) return;
+  velo('<h2>No trabaja aquí</h2><p>¿<b>'+esc(c.nombre)+'</b> (C.I. '+esc(c.cedula)+') <b>no trabaja</b> en su escuela?</p><p class="muted">Se le avisa a la coordinación. Si se equivoca, puede deshacerlo con «Sí trabaja aquí».</p><div class="fila" style="margin-top:12px"><button class="sec" onclick="cerrarVelo()">Cancelar</button><button class="ok" onclick="hechoAccion(\'quitarHecho\','+i+',\'Guardando…\')">Sí, no trabaja aquí</button></div>');
+}
+function devolverHecho(i){ hechoAccion('devolverHecho', i, 'Guardando…'); }
+function corregirHecho(i){
+  var c = HECHOS[i]; if (!c) return;
+  velo('<h2>Corregir carnet</h2><p>Se abrirá la corrección de <b>'+esc(c.nombre)+'</b> en «Correcciones pendientes». Allí corrige los datos y lo envía.</p><p class="muted">La foto se toma del carnet anterior; súbala de nuevo solo si la foto es el error. Si el carnet ya se imprimió, la reimpresión tiene costo.</p><div class="fila" style="margin-top:12px"><button class="sec" onclick="cerrarVelo()">Cancelar</button><button class="ok" onclick="hechoAccion(\'corregirHecho\','+i+',\'Abriendo la corrección…\')">Sí, corregir</button></div>');
+}
+async function hechoAccion(fn, i, msg){
+  var c = HECHOS[i]; if (!c) return;
+  cargando(msg);
+  try{ respHechos(await srv(fn, PARAMS.e, PARAMS.k, c.id)); cerrarVelo(); if (fn === 'corregirHecho') window.scrollTo(0,0); }
+  catch(e){ fallo(e); }
+}
+async function cancelarCorreccion(fila){
+  cargando('Cancelando…');
+  try{ respHechos(await srv('cancelarCorreccion', PARAMS.e, PARAMS.k, fila)); cerrarVelo(); }
+  catch(e){ fallo(e); }
 }
 async function verHecho(i){
   var c = HECHOS[i]; if (!c) return;
@@ -194,12 +227,13 @@ function avisoRechazados(l, queHacer){
 function tarjetaCorreccion(l){
   var ps = personasDe(l.lote), falta = ps.filter(function(p){return p.estado==='CORREGIR';}).length;
   var h = '<div class="card" style="border:2px solid #f0c36a"><div class="fila" style="justify-content:space-between"><h2>Correcciones pendientes</h2><span class="chip warn">'+falta+' por corregir</span></div>' +
-          '<p class="muted">Estos carnets no se pudieron imprimir por los errores indicados. Corrija cada uno, revise el carnet y guárdelo.</p>';
+          '<p class="muted">Corrija cada uno según lo indicado, revise el carnet y guárdelo. Al final pulse «Terminar correcciones y enviar».</p>';
   ps.forEach(function(p){
     var listo = p.estado==='CORREGIDO';
     h += '<div class="persona"><div><b>'+esc(p.nombres+' '+p.apellidos)+'</b><small>'+esc(p.nac+'-'+p.cedula)+'</small>' +
          '<div class="'+(listo?'bien':'aviso')+'" style="margin:6px 0 0;padding:6px 10px">'+(listo?'Corregido ✓':esc(p.problema||'Revisar datos'))+'</div></div>' +
-         '<button class="'+(listo?'sec':'')+'" onclick="editar('+p.fila+')">'+(listo?'Ver':'Corregir')+'</button></div>';
+         '<div class="fila"><button class="'+(listo?'sec':'')+'" onclick="editar('+p.fila+')">'+(listo?'Ver':'Corregir')+'</button>' +
+         (p.hecho ? '<button class="sec" onclick="cancelarCorreccion('+p.fila+')">Cancelar corrección</button>' : '') + '</div></div>';   // 17-11
   });
   h += avisoRechazados(l, 'En una corrección no se pueden agregar personas: comuníquese con la coordinación (contacto al final de la página).');
   h += '<button class="full ok" style="margin-top:12px" '+(falta?'disabled':'')+' onclick="terminar(\''+l.lote+'\')">Terminar correcciones y enviar</button>';
@@ -394,6 +428,23 @@ async function editar(fila){
   else { P.cargoOtro=true; P.cargoTexto=p.cargo; }
   abrirForm();
   if (p.foto) { try{ P.fotoImg = await img(await srv('fotoPersona', PARAMS.e, PARAMS.k, p.foto)); vistaPrevia(); }catch(e){} }
+  else if (p.hecho && p.hechoId) {   // 17-11 (Virginia): corregir un carnet ya hecho sin volver a subir la foto
+    try{ var dat = fotoDeCarnet(await img(await srv('carnetHecho', PARAMS.e, PARAMS.k, p.hechoId)));
+      if (dat && P && P.fila === p.fila && !P.fotoData) { P.fotoData = dat; P.fotoAnterior = true; P.fotoImg = await img(dat);
+        $('fFotoMsg').innerHTML='<div class="aviso">Se usa la foto del carnet anterior. Súbala de nuevo <b>solo si la foto es el error</b>.</div>'; vistaPrevia(); }
+    }catch(e){}
+  }
+}
+// La foto dentro del carnet ya hecho (mismo diseño de 62×95 mm: marco azul de 22,1×27 mm). Si no se encuentra el marco, no se usa.
+function fotoDeCarnet(im){
+  var k = im.width/1465, MM = 600/25.4*k, x0 = (12.95+3)*MM, w = 22.1*MM, h = 27*MM;
+  var c = document.createElement('canvas'); c.width = im.width; c.height = im.height; var x = c.getContext('2d'); x.drawImage(im, 0, 0);
+  var azul = function(px,py){ var d = x.getImageData(Math.round(px), Math.round(py), 1, 1).data; return d[2] > 60 && d[2] - d[0] > 30 && d[0] < 90; };
+  var y0 = [13.4, 15.9].map(function(y){ return (y+3)*MM; }).filter(function(y){ return azul(x0 + w/2, y - 0.3*MM) && azul(x0 - 0.3*MM, y + h/2); })[0];
+  if (y0 === undefined) return '';
+  var o = document.createElement('canvas'); o.width = 600; o.height = Math.round(600*h/w);
+  o.getContext('2d').drawImage(c, x0, y0, w, h, 0, 0, o.width, o.height);
+  return o.toDataURL('image/jpeg', 0.92);
 }
 function verCarnet(fila){ editar(fila).then(function(){ document.querySelectorAll('#fForm input,#fForm select,#fForm textarea,#fForm button').forEach(function(x){x.disabled=true;}); $('bGuardar').classList.add('oculto'); $('fAviso').classList.add('oculto'); }); }
 
@@ -461,7 +512,7 @@ async function nuevaFoto(){
   var f=$('fFoto').files[0]; if(!f) return;
   try{ var r = await reducir(f, 1000, 1250, 0.9); }catch(e){ $('fFotoMsg').innerHTML='<div class="err">No se pudo leer esa imagen. Use una foto JPG tomada con la cámara.</div>'; return; }
   var prob = revisarFoto(r);
-  P.fotoData = r.url; P.fotoId=''; P.fotoImg = await img(r.url); P.excepcionFoto='';
+  P.fotoData = r.url; P.fotoId=''; P.fotoImg = await img(r.url); P.excepcionFoto=''; P.fotoAnterior=false;
   if (prob.length) {
     $('fFotoMsg').innerHTML='<div class="err">'+prob.map(esc).join('<br>')+'</div><button class="sec" onclick="pedirExcepcion()">Es la única foto que hay: pedir excepción a la coordinación</button>';
     P.fotoRechazo = prob.join(' ');
@@ -485,7 +536,7 @@ async function guardar(){
   if (!P.fotoData && !P.fotoId) return err('Falta la foto.');
   var cargo=cargoFinal(); if(!cargo) return err(P.cargoBase==='DOCENTE ESPECIALISTA'?'Elija el área del especialista.':'Elija el cargo.');
   var d={fila:P.fila||'', lote:P.lote, nac:P.nac, cedula:P.cedula, nombres:P.nombres, apellidos:P.apellidos, genero:P.genero, tipo:P.tipo,
-         cargo:cargo, area:P.area||'', atipico:P.atipico, motivo:P.motivo, cargoOtro:P.cargoOtro, foto:P.fotoData||'', fotoId:P.fotoData?'':P.fotoId, excepcionFoto:P.excepcionFoto||''};
+         cargo:cargo, area:P.area||'', atipico:P.atipico, motivo:P.motivo, cargoOtro:P.cargoOtro, foto:P.fotoData||'', fotoId:P.fotoData?'':P.fotoId, excepcionFoto:P.excepcionFoto||'', fotoAnterior:!!P.fotoAnterior};
   cargando();
   try{ var r = await srv('guardarPersona', PARAMS.e, PARAMS.k, d); ESTADO.vista='inicio'; refrescar(r); cerrarVelo(); window.scrollTo(0,0); }
   catch(e){ cerrarVelo(); err(e); }
