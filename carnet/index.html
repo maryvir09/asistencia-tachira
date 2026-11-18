@@ -181,20 +181,21 @@ function tarjetaLote(l){
   var ps = personasDe(l.lote), abierto = ['PAGO EN ESPERA','ABIERTO'].indexOf(l.estado)>=0;
   var h = '<div class="card"><div class="fila" style="justify-content:space-between"><h2>Grupo de '+l.cupos+' carnet'+(l.cupos>1?'s':'')+'</h2>'+chipLote(l)+'</div>';
   var et={'EN ESPERA':'<span class="chip warn">en espera</span>','CONFIRMADO':'<span class="chip ok">confirmado</span>','RECHAZADO':'<span class="chip bad">rechazado</span>','ANULADO':'<span class="chip">anulado</span>'};
-  var porReemplazar = (l.pagos||[]).filter(function(t){ return t.estado==='RECHAZADO' && !t.reemplazada && l.estado==='PAGO EN ESPERA'; });
+  var esComp = function(t){ return /Complemento C\d+/.test(t.nota||''); };   // 17-11 noche: complemento de pago
+  var porReemplazar = (l.pagos||[]).filter(function(t){ return t.estado==='RECHAZADO' && !t.reemplazada && l.estado==='PAGO EN ESPERA' && !esComp(t); });
   var vivas = (l.pagos||[]).filter(function(t){ return !t.reemplazada; }), muchas = vivas.length>5, lista='';
   if (muchas) { var cu={}; vivas.forEach(function(t){ cu[t.estado]=(cu[t.estado]||0)+1; });
     h += '<div class="muted">'+vivas.length+' transferencias · '+bs(vivas.reduce(function(a,t){return a+t.monto;},0))+' Bs · '+Object.keys(cu).map(function(k){return cu[k]+' '+(({'EN ESPERA':'en espera','CONFIRMADO':'confirmadas','RECHAZADO':'rechazadas'})[k]||k.toLowerCase());}).join(', ')+'</div>'; }
   vivas.forEach(function(t){
     var pend = porReemplazar.indexOf(t)>=0;
-    var linea = '<div class="muted">Transferencia ref. …'+esc(String(t.ref).slice(-6))+' · '+bs(t.monto)+' Bs'+(t.fecha?' · '+esc(t.fecha):'')+' '+(vivas.length>1||pend?(et[t.estado]||''):'')+'</div>';
+    var linea = '<div class="muted">'+(esComp(t)?'Complemento':'Transferencia')+' ref. …'+esc(String(t.ref).slice(-6))+' · '+bs(t.monto)+' Bs'+(t.fecha?' · '+esc(t.fecha):'')+' '+(vivas.length>1||pend||esComp(t)?(et[t.estado]||''):'')+'</div>';
     if (muchas && !pend) { lista += linea; return; }
     h += linea;
     if (pend) h += '<div class="err" style="margin:6px 0">La coordinación rechazó esta transferencia'+(t.nota?': '+esc(t.nota):'')+'. Suba la transferencia correcta en su lugar; las demás siguen igual.<button class="full" style="margin-top:8px" onclick="formReemplazo(\''+esc(l.lote)+'\',\''+esc(t.id)+'\')">Subir la transferencia correcta</button></div>';
   });
   if (lista) h += '<details style="margin:4px 0"><summary class="muted" style="cursor:pointer">Ver todas las transferencias</summary>'+lista+'</details>';
   if (l.estado==='PAGO EN ESPERA' && !porReemplazar.length) h += '<div class="aviso">El pago se confirma cuando la coordinación carga el estado de cuenta (todos los días después de la 1:00 p. m.'+(D.ultimaCarga?'; última carga: '+esc(D.ultimaCarga):'')+'). Mientras tanto ya puede cargar a su personal.</div>';
-  if (l.estado==='PAGO RECHAZADO') { var rj=(l.pagos||[]).filter(function(t){return t.estado==='RECHAZADO';})[0]; h += '<div class="err">La coordinación no encontró este pago'+(rj?' (ref. …'+esc(String(rj.ref).slice(-6))+')':'')+'. '+esc(rj&&rj.nota||'')+' Registre el pago de nuevo con los datos correctos.</div>'; }
+  if (l.estado==='PAGO RECHAZADO') { var rj=(l.pagos||[]).filter(function(t){return t.estado==='RECHAZADO' && !esComp(t);})[0]; h += '<div class="err">La coordinación no encontró este pago'+(rj?' (ref. …'+esc(String(rj.ref).slice(-6))+')':'')+'. '+esc(rj&&rj.nota||'')+' Registre el pago de nuevo con los datos correctos.</div>'; }
   h += '<div class="barra" style="margin:10px 0"><i style="width:'+Math.round(100*ps.length/l.cupos)+'%"></i></div><div class="muted">'+ps.length+' de '+l.cupos+' cargados</div>';
   if (abierto && ps.length > l.cupos) h += '<div class="aviso">Hay <b>'+(ps.length-l.cupos)+' persona'+(ps.length-l.cupos>1?'s':'')+' de más</b>: este grupo tiene '+l.cupos+' carnets pagados y '+ps.length+' personas. Quite con «No trabaja aquí» a quien no trabaje en su escuela, o pague los que faltan con el botón «Pagar más carnets para este grupo».</div>';   // 16-11 / 17-11
   ps.forEach(function(p){   // los grupos enviados se ven pero no se editan (Virginia 13-11: los datos son responsabilidad de la escuela)
@@ -208,6 +209,8 @@ function tarjetaLote(l){
     var sug = l.estado==='PAGO RECHAZADO' ? ps.length : Math.max(ps.length - l.cupos, 0);
     h += '<button class="sec full" style="margin-top:10px" onclick="formPago(\''+esc(l.lote)+'\','+sug+')">'+(l.estado==='PAGO RECHAZADO'?'Pagar este grupo otra vez':'Pagar más carnets para este grupo')+'</button>';
   }
+  if (l.tipo!=='CORRECCION' && l.estado!=='PAGO RECHAZADO' && !/SIN PAGO/i.test(String(l.pago||'')))   // 17-11 noche: diferencia que faltó (p. ej. 1.000 o 2.000 Bs por el cambio de precio)
+    h += '<button class="sec full" style="margin-top:8px" onclick="formPago(\''+esc(l.lote)+'\',0,true)">Pagar una diferencia (complemento)</button>';
   if (abierto && ps.length < l.cupos) h += '<button class="full" style="margin-top:10px" onclick="nueva(\''+l.lote+'\')">+ Agregar persona ('+(l.cupos-ps.length)+' cupo'+(l.cupos-ps.length>1?'s':'')+' libre'+(l.cupos-ps.length>1?'s':'')+')</button>';
   if (abierto) {
     var listo = l.estado==='ABIERTO' && ps.length===l.cupos && !ps.some(function(p){return p.estado==='POR APROBAR';});
@@ -274,14 +277,15 @@ function bloque(i){
    '<label>Capture de esta transferencia</label><input id="tK'+i+'" type="file" accept="image/*"><div class="muted">Toque la casilla y elija la foto del capture en su galería.</div>';
   return d;
 }
-function formPago(lote, sug){
+function formPago(lote, sug, comp){
   var c = D.cuentas.length ? '<div class="muted" style="white-space:pre-line;margin-bottom:6px">'+esc(D.cuentas.join('\n\n'))+'</div>' : '';
-  ESTADO.vista='pago'; NB=0; SUBIDOS={}; ESTADO.lotePago = lote || ''; window.scrollTo(0,0);
+  ESTADO.vista='pago'; NB=0; SUBIDOS={}; ESTADO.lotePago = lote || ''; ESTADO.complemento = !!(comp && lote); ESTADO.compOk = false; window.scrollTo(0,0);
   var L = lote ? D.lotes.filter(function(x){return x.lote===lote;})[0] : null;
-  var extra = L ? '<div class="bien">Este pago se suma al <b>grupo de '+L.cupos+' carnet'+(L.cupos>1?'s':'')+'</b> que ya tiene ('+personasDe(lote).length+' personas cargadas). Indique solo los carnets <b>que paga ahora</b>.</div>' : '';
-  $('app').innerHTML=('<div class="card"><div class="fila" style="justify-content:space-between"><h2>'+(L?'Pagar más carnets para este grupo':'Registrar pago')+'</h2><button class="sec" onclick="volver()">← Volver</button></div>'+extra+c+
+  var extra = ESTADO.complemento ? '<div class="bien">Use esto si le <b>faltó una diferencia</b> en un pago que ya subió (por ejemplo por el cambio de precio). Se anota en el <b>grupo de '+L.cupos+' carnet'+(L.cupos>1?'s':'')+'</b>; <b>no suma carnets</b>.</div>'
+    : L ? '<div class="bien">Este pago se suma al <b>grupo de '+L.cupos+' carnet'+(L.cupos>1?'s':'')+'</b> que ya tiene ('+personasDe(lote).length+' personas cargadas). Indique solo los carnets <b>que paga ahora</b>.</div>' : '';
+  $('app').innerHTML=('<div class="card"><div class="fila" style="justify-content:space-between"><h2>'+(ESTADO.complemento?'Pagar una diferencia (complemento)':L?'Pagar más carnets para este grupo':'Registrar pago')+'</h2><button class="sec" onclick="volver()">← Volver</button></div>'+extra+c+
    '<p class="muted">Precio: <b>'+bs(D.precio)+' Bs por carnet</b>.'+reglaPrecio()+'</p>'+
-   '<label>¿Cuántos carnets paga?</label><input id="pCant" type="number" min="1" inputmode="numeric" oninput="resumenPago()">'+
+   '<div'+(ESTADO.complemento?' class="oculto"':'')+'><label>¿Cuántos carnets paga?</label><input id="pCant" type="number" min="1" inputmode="numeric" oninput="resumenPago()"></div>'+
    '<label>¿En cuántas transferencias pagó?</label><input id="pNT" type="number" min="1" max="'+MAXT+'" value="1" inputmode="numeric" oninput="verBloques()">'+
    '<div class="muted">Si pagó el total de una vez, deje 1. Si pagaron por partes (por ejemplo, cada persona su carnet), escriba cuántas transferencias son y llene cada una con su capture.</div>'+
    '<div id="tLista"></div>'+
@@ -289,6 +293,11 @@ function formPago(lote, sug){
   verBloques();
   if (sug > 0) { $('pCant').value = sug; resumenPago(); }
 }
+// 17-11 noche (Virginia): el complemento tiene monto libre, pero si alcanza para 1 carnet o más se AVISA (sin bloquear),
+// por si la escuela quería «Pagar más carnets para este grupo». Se usa el precio más bajo vigente (5.000 en el período doble).
+function precioMin(){ var P=D.precios||{}; return P.doble ? Math.min(P.base||D.precio, P.nuevo||D.precio) : (D.precio||P.base||0); }
+function avisoComp(total){ var p=precioMin(); if(!(p>0) || total<p) return '';
+  return '<div class="aviso"><b>Ojo:</b> '+bs(total)+' Bs alcanzan para '+Math.floor(total/p)+' carnet'+(Math.floor(total/p)>1?'s':'')+'. Un complemento <b>no suma carnets</b>. Si lo que quiere es pagar carnets, vuelva y use «Pagar más carnets para este grupo».</div>'; }
 function nT(){ var n=Math.floor(+$('pNT').value||1); return Math.max(1, Math.min(MAXT, n)); }
 function verBloques(){
   var n=nT(), L=$('tLista');
@@ -312,6 +321,8 @@ function resumenPago(){
     if (!(t.monto>0) || !t.fecha) { faltan++; return; }
     total += t.monto;
   });
+  if (ESTADO.complemento) { ESTADO.compOk = false;   // si cambia el monto, se vuelve a preguntar
+    $('pRes').innerHTML = faltan ? '' : (avisoComp(total) || '<div class="bien">Complemento de '+bs(total)+' Bs. No suma carnets. ✓</div>'); return; }   // monto libre (Virginia 17-11)
   if (!faltan) valor = valorar(T, cant);
   var v = Math.round(valor*100)/100, h='';
   if (!cant) h = '';
@@ -323,7 +334,8 @@ function resumenPago(){
 async function enviarPago(){
   var cant=+$('pCant').value, T=leerTransf();
   var err=function(m){$('pErr').innerHTML='<div class="err">'+esc(m)+'</div>'; aviso(m);};
-  if(!cant || cant<1 || cant!==Math.floor(cant)) return err('Indique cuántos carnets paga.');
+  if (ESTADO.complemento) cant = 0;
+  else if(!cant || cant<1 || cant!==Math.floor(cant)) return err('Indique cuántos carnets paga.');
   var valor=0, refs={};
   for (var i=0;i<T.length;i++){
     var t=T[i], n = T.length>1 ? ' (transferencia '+(i+1)+')' : '';
@@ -337,11 +349,13 @@ async function enviarPago(){
     if(!t.cuenta) return err('Indique a qué cuenta pagó'+n+'.');
     if(!t.file) return err('Suba el capture'+n+'.');
   }
-  valor = valorar(T, cant);
-  if (Math.abs(valor-cant)>0.001) return err('Lo transferido alcanza para '+(Math.round(valor*100)/100).toLocaleString('es-VE')+' carnet(s) y usted indicó '+cant+'. Revise los montos y las fechas.'+(reglaPrecio()?' Recuerde: '+reglaPrecio().replace(/<[^>]+>/g,''):''));
+  if (!ESTADO.complemento) valor = valorar(T, cant);   // el complemento tiene monto libre (Virginia 17-11)
+  else { var totC=T.reduce(function(a,t){return a+t.monto;},0);   // aviso sin bloquear: hay que confirmar una vez
+    if (avisoComp(totC) && !ESTADO.compOk) return velo('<h2>¿Es una diferencia?</h2>'+avisoComp(totC)+'<div class="fila" style="margin-top:12px"><button class="sec" onclick="cerrarVelo()">Volver</button><button class="ok" onclick="ESTADO.compOk=true;cerrarVelo();enviarPago()">Sí, es un complemento</button></div>'); }
+  if (!ESTADO.complemento && Math.abs(valor-cant)>0.001) return err('Lo transferido alcanza para '+(Math.round(valor*100)/100).toLocaleString('es-VE')+' carnet(s) y usted indicó '+cant+'. Revise los montos y las fechas.'+(reglaPrecio()?' Recuerde: '+reglaPrecio().replace(/<[^>]+>/g,''):''));
   velo('<h2>Registrando pago…</h2><div class="barra"><i id="pBar" style="width:5%"></i></div><p class="muted" id="pBarT">Preparando…</p><p class="muted">No cierre esta página.</p>');
   try{
-    var datos={cantidad:cant, transferencias:[]}; if (ESTADO.lotePago) datos.lote = ESTADO.lotePago;   // 17-11
+    var datos={cantidad:cant, transferencias:[]}; if (ESTADO.complemento) datos.complemento = ESTADO.lotePago; else if (ESTADO.lotePago) datos.lote = ESTADO.lotePago;   // 17-11
     for (var j=0;j<T.length;j++){
       var s = SUBIDOS[T[j].i];
       if (!s || s.file!==T[j].file){
@@ -354,7 +368,7 @@ async function enviarPago(){
       datos.transferencias.push({monto:T[j].monto, fecha:T[j].fecha, referencia:T[j].referencia, banco:T[j].banco, cuenta:T[j].cuenta, captureId:s.id});
     }
     $('pBarT').textContent = 'Registrando…';
-    var r = await srv('registrarPago', PARAMS.e, PARAMS.k, datos); ESTADO.vista='inicio'; ESTADO.lotePago=''; SUBIDOS={}; refrescar(r); cerrarVelo(); window.scrollTo(0,0);
+    var r = await srv('registrarPago', PARAMS.e, PARAMS.k, datos); ESTADO.vista='inicio'; ESTADO.lotePago=''; ESTADO.complemento=false; ESTADO.compOk=false; SUBIDOS={}; refrescar(r); cerrarVelo(); window.scrollTo(0,0);
   }catch(e){ cerrarVelo(); err(e); }
 }
 
@@ -541,7 +555,7 @@ async function guardar(){
   try{ var r = await srv('guardarPersona', PARAMS.e, PARAMS.k, d); ESTADO.vista='inicio'; refrescar(r); cerrarVelo(); window.scrollTo(0,0); }
   catch(e){ cerrarVelo(); err(e); }
 }
-function volver(){ ESTADO.vista='inicio'; ESTADO.lotePago=''; P=null; pintar(); window.scrollTo(0,0); }
+function volver(){ ESTADO.vista='inicio'; ESTADO.lotePago=''; ESTADO.complemento=false; ESTADO.compOk=false; P=null; pintar(); window.scrollTo(0,0); }
 
 // ---------------------------------------------------------------- quitar persona (16-11, pedido de Virginia: la escuela saca a quien no trabaja ahí)
 function quitar(fila){
