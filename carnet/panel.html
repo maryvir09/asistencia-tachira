@@ -59,6 +59,30 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return
 function bs(n){return Number(n).toLocaleString('es-VE');}
 // Carnets por archivo PDF: 25 (unos 16 MB por envío; con 50 eran unos 32 MB). Decisión de Virginia 13-11.
 var POR_PDF = 25;
+// 18-11 versión L: la foto se prepara como en la PC (sistema/preparar_fotos.py): cara encuadrada, nitidez y tamaño exacto.
+// El preparador vive en Drive, carpeta «CARNET_PREPARADOR_DE_FOTOS (no borrar)»; cada archivo se comprueba con su huella SHA-256
+// antes de usarlo: si alguien lo cambia, el panel NO genera el PDF.
+var PREPARADOR = [
+  ['lanczos.js', '1O5iKyqHd3EV4UoVswikaCBYj7QRNOy1t', '9fa72934ba1d82101cca3e9ca697bd9879762da32cfaf2dfeef83c3107de5973'],
+  ['yunet.js', '1-cQgwmzZeQjUQD8vAzjdeKGPAxK-awgj', '0b465afd355526156384a9400b47be4d9c394ed69b74d7483e279e0152006fd7'],
+  ['encuadre.js', '1vKXGHcSDkd8HHYE5lKr7U8bqp0juVgaG', '7eee94d69adc11ec5f154e592c068f1046ecbbffe7a17f3956963abde7d015b0'],
+  ['foto.js', '1_0HtGE7fGCev-9BPhz6zMNKf480A7IgS', '4c8d869f223efe8e58d94f2e2fbfa1929c671390ecb55265791f2d7c3914a2e6'],
+  ['yunet_web.json', '1ZovMRLTxy-gHO6PZOUTH-FbpO6sTRjjn', 'cdf216dd9f61fcc0398823eea36307a40f0bc0aa8c2f1ef1cdc3a5046fa33a9a'],
+  ['yunet_web.bin', '1xviQipZbXmmAT-_o4SIs2vd9Mzw2Ijck', '8ae00aef063a2fb10cd4915c776d7198418a87777d4a13aa274601cfdcd4ca6f']];
+var PREPARADOR_LISTO = false;
+async function cargarPreparador(){
+  if (PREPARADOR_LISTO) return;
+  var b = {};
+  for (var i=0;i<PREPARADOR.length;i++){
+    var x = PREPARADOR[i], buf = await fetch(await srv('fotoAdmin', K, x[1])).then(function(r){ return r.arrayBuffer(); });
+    var h = Array.prototype.map.call(new Uint8Array(await crypto.subtle.digest('SHA-256', buf)), function(v){ return ('0'+v.toString(16)).slice(-2); }).join('');
+    if (h !== x[2]) throw 'El archivo '+x[0]+' del preparador de fotos no es el probado. No se generó el PDF.';
+    b[x[0]] = buf;
+    if (/\.js$/.test(x[0])) { var sc = document.createElement('script'); sc.textContent = new TextDecoder().decode(buf); document.head.appendChild(sc); }
+  }
+  FOTO.usar(JSON.parse(new TextDecoder().decode(b['yunet_web.json'])), b['yunet_web.bin']);
+  PREPARADOR_LISTO = true;
+}
 var API = 'https://script.google.com/macros/s/AKfycbymxmjlvceY5IaQkz28MOsvxwk7TNmNXQ5cKL92t6aA1-eiSxvRmFMFy54w_70ALltTzg/exec';
 // Igual que la página de las escuelas: se llama al servidor por la puerta web. Solo se reintenta lo que no guarda nada.
 async function srv(fn){
@@ -252,14 +276,18 @@ async function pdf(lote){
     await CARNET.loadFonts(d.assets.fonts);
     var bg={}; for (var g in d.assets.bg) bg[g]=await img(d.assets.bg[g]);
     var inst={corto:d.escuela.corto, oficial:d.escuela.oficial, periodo:d.periodo};
-    var cv=document.createElement('canvas'), partes=[], doc=null, n=0, thumbs=[];
+    var cv=document.createElement('canvas'), partes=[], doc=null, n=0, thumbs=[], revisar=[];
+    try{ $('barT').textContent='Cargando el preparador de fotos…'; await cargarPreparador(); }catch(e){ throw (/huella|no es el probado/.test(String(e)) ? String(e) : 'No se pudo cargar el preparador de fotos, así que NO se generó el PDF (saldría con la cara pequeña). Revise el internet y vuelva a intentar.'); }
     for (var i=0;i<d.personas.length;i++){
       var p=d.personas[i];
       if (n===0) doc = await PDFLib.PDFDocument.create();
-      var foto = p.foto ? await img(await srv('fotoAdmin', K, p.foto)) : null;
+      var foto = p.foto ? await img(await srv('fotoAdmin', K, p.foto)) : null, notas = [];
+      // 18-11 (versión L): encuadre, nitidez y tamaño exacto del marco (522 x 638) como la PC. Si falla, no se genera el PDF.
+      if (foto) { $('barT').textContent=(i+1)+' de '+d.personas.length+' · preparando la foto…'; await new Promise(function(r){ setTimeout(r, 30); }); var pf = await FOTO.preparar(foto, {w:522, h:638}); foto = pf.marco; notas = pf.notas.filter(function(t){ return /no se detectó la cara/.test(t); }); }   // 18-11 Virginia: sin avisos nuevos; solo si no hay cara
+      if (notas.length) revisar.push((i+1)+'. '+p.nombres+' '+p.apellidos+': '+notas.join('; '));
       CARNET.render(cv, bg[CARNET.grupo(p.tipo)], {nombres:p.nombres, apellidos:p.apellidos, nombre:p.nombres+' '+p.apellidos, ci:p.nac+'-'+p.cedula, tipo:p.tipo, cargo:p.cargo}, inst, foto);
       var jpg = cv.toDataURL('image/jpeg', 0.95);
-      thumbs.push('<figure style="margin:0"><img src="'+jpg+'" style="width:150px;border-radius:6px;box-shadow:0 2px 8px #0002"><figcaption class="muted" style="width:150px;font-size:12px">'+(i+1)+'. '+esc(p.nombres+' '+p.apellidos)+'</figcaption></figure>');
+      thumbs.push('<figure style="margin:0"><img src="'+jpg+'" style="width:150px;border-radius:6px;box-shadow:0 2px 8px #0002"><figcaption class="muted" style="width:150px;font-size:12px">'+(i+1)+'. '+esc(p.nombres+' '+p.apellidos)+(notas.length?'<br><b style="color:#a12b2b">Revisar: '+esc(notas.join('; '))+'</b>':'')+'</figcaption></figure>');
       var im = await doc.embedJpg(jpg);
       var pg = doc.addPage([mmPt(62), mmPt(95)]); pg.drawImage(im, {x:0, y:0, width:mmPt(62), height:mmPt(95)});
       n++; $('bar').style.width = Math.round(100*(i+1)/d.personas.length)+'%'; $('barT').textContent=(i+1)+' de '+d.personas.length;
@@ -274,7 +302,7 @@ async function pdf(lote){
     }
     D = await srv('panel', K); pintar(); window.LINKS_PDF = links;
     velo('<h2>PDF listo</h2><div class="bien">Quedó guardado en la carpeta «PDF PARA IMPRENTA».</div>'+
-      '<button class="ok full" style="margin:6px 0" onclick="enviarPdfListo()">Enviar por WhatsApp</button>'+PARTES.map(function(x,i){return '<button class="full" style="margin:6px 0" onclick="bajar('+i+')">Descargar '+esc(x[1])+'</button>';}).join('')+'<p class="muted">Revise cada carnet antes de mandarlo a la imprenta:</p><div class="fila" style="align-items:flex-start">'+thumbs.join('')+'</div><button class="full" style="margin-top:12px" onclick="cerrarVelo()">Cerrar</button>');
+      '<button class="ok full" style="margin:6px 0" onclick="enviarPdfListo()">Enviar por WhatsApp</button>'+PARTES.map(function(x,i){return '<button class="full" style="margin:6px 0" onclick="bajar('+i+')">Descargar '+esc(x[1])+'</button>';}).join('')+(revisar.length?'<div class="aviso"><b>Revise estas fotos antes de imprimir ('+revisar.length+'):</b><br>'+revisar.map(esc).join('<br>')+'</div>':'')+'<p class="muted">Revise cada carnet antes de mandarlo a la imprenta:</p><div class="fila" style="align-items:flex-start">'+thumbs.join('')+'</div><button class="full" style="margin-top:12px" onclick="cerrarVelo()">Cerrar</button>');
   }catch(e){ fallo(e); }
 }
 
