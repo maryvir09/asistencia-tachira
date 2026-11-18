@@ -191,7 +191,7 @@ function tarjetaLote(l){
     var linea = '<div class="muted">'+(esComp(t)?'Complemento':'Transferencia')+' ref. …'+esc(String(t.ref).slice(-6))+' · '+bs(t.monto)+' Bs'+(t.fecha?' · '+esc(t.fecha):'')+' '+(vivas.length>1||pend||esComp(t)?(et[t.estado]||''):'')+'</div>';
     if (muchas && !pend) { lista += linea; return; }
     h += linea;
-    if (pend) h += '<div class="err" style="margin:6px 0">La coordinación rechazó esta transferencia'+(t.nota?': '+esc(t.nota):'')+'. Suba la transferencia correcta en su lugar; las demás siguen igual.<button class="full" style="margin-top:8px" onclick="formReemplazo(\''+esc(l.lote)+'\',\''+esc(t.id)+'\')">Subir la transferencia correcta</button></div>';
+    if (pend) h += '<div class="err" style="margin:6px 0">La coordinación rechazó esta transferencia'+(t.nota?': '+esc(t.nota):'')+'. Súbala de nuevo con el botón «Pagar más carnets para este grupo». Si ya la subió de nuevo, no la suba otra vez: espere a que la coordinación la confirme.</div>';   // K 18-11: se quitó el botón de reemplazo; llamaba a una función que no existe en el servidor
   });
   if (lista) h += '<details style="margin:4px 0"><summary class="muted" style="cursor:pointer">Ver todas las transferencias</summary>'+lista+'</details>';
   if (l.estado==='PAGO EN ESPERA' && !porReemplazar.length) h += '<div class="aviso">El pago se confirma cuando la coordinación carga el estado de cuenta (todos los días después de la 1:00 p. m.'+(D.ultimaCarga?'; última carga: '+esc(D.ultimaCarga):'')+'). Mientras tanto ya puede cargar a su personal.</div>';
