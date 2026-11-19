@@ -110,14 +110,14 @@ function textoDoble(){
   return ' · Precio: '+est+' · Desde el '+P.desde.split('-').reverse().join('/')+': '+c.c6+' carnet(s) a '+bs(P.nuevo)+' y '+c.c5+' a '+bs(P.base)+' ('+c.pagos+' pago(s))';
 }
 function pintar(){
-  var term = D.lotes.filter(function(l){return l.estado==='TERMINADO' && mio(l.municipio);}).length;
+  var tE = {}; D.lotes.forEach(function(l){ if (l.estado==='TERMINADO' && mio(l.municipio)) tE[l.escuela]=1; }); var term = Object.keys(tE).length;   // M 19-11: escuelas, no grupos
   var nAl = D.alertas.filter(function(a){return mio(a.municipio);}).length;
   $('hSub').textContent = 'Hola, ' + D.usuario + ' · Última carga del estado de cuenta: ' + (D.ultimaCarga || 'nunca') + textoDoble();
   var nP = {}; D.pagos.forEach(function(p){ nP[p.lote||p.id]=1; });
-  var t=[['pagos','Pagos en espera ('+Object.keys(nP).length+')'],['banco','Cargar estado de cuenta'],['alertas','Alertas ('+nAl+')'],['lotes','Para revisar ('+term+')'],['enlaces','Enlaces de escuelas']];
+  var t=[['pagos','Pagos en espera ('+Object.keys(nP).length+')'],['banco','Cargar estado de cuenta'],['alertas','Alertas ('+nAl+')'],['lotes','Para revisar ('+term+')'],['reporte','Reporte del día'],['enlaces','Enlaces de escuelas']];
   var filtro = D.misMunicipios.length ? '<label style="display:flex;gap:6px;align-items:center;font-weight:500;margin:0 0 0 6px"><input type="checkbox" style="width:auto" '+(MIOS?'checked':'')+' onchange="MIOS=this.checked;pintar()"> Solo mis municipios</label>' : '';
   $('tabs').innerHTML = filtro + t.map(function(x){return '<button class="'+(TAB===x[0]?'act':'')+'" onclick="TAB=\''+x[0]+'\';pintar()">'+x[1]+'</button>';}).join('');
-  $('app').innerHTML = ({pagos:vPagos, banco:vBanco, alertas:vAlertas, lotes:vLotes, enlaces:vEnlaces})[TAB]();
+  $('app').innerHTML = ({pagos:vPagos, banco:vBanco, alertas:vAlertas, lotes:vLotes, reporte:vReporte, enlaces:vEnlaces})[TAB]();
 }
 
 function vPagos(){
@@ -221,19 +221,56 @@ function ofrecerWA(cod, tel, cuerpo){
     '<button class="sec full" style="margin-top:8px" onclick="cerrarVelo()">'+(u?'No avisar':'Cerrar')+'</button>');
 }
 
-function vLotes(){
-  var L = D.lotes.filter(function(l){return ['TERMINADO','PDF GENERADO'].indexOf(l.estado)>=0 && mio(l.municipio);});
-  var h = L.length ? '' : '<div class="card"><div class="bien">No hay grupos esperando revisión.</div></div>';
-  h += L.map(function(l){
-    return '<div class="card"><div class="fila" style="justify-content:space-between"><h2>'+esc(l.escuela)+' · '+l.cargados+' carnets</h2><span class="chip '+(l.estado==='TERMINADO'?'warn':'ok')+'">'+(l.tipo==='CORRECCION'?'Corrección · ':'')+esc(l.estado)+'</span></div>'+
-      '<div class="muted">'+esc(l.municipio)+' · Terminado por '+esc(l.quien)+' · '+esc(l.cuando)+(l.revisado?' · PDF: '+esc(l.revisado):'')+'</div>'+
-      (l.pdf?'<div style="margin-top:6px">'+l.pdf.split('\n').map(function(u,i){return '<a href="'+esc(u)+'" target="_blank">Abrir PDF guardado'+(l.pdf.indexOf('\n')>=0?' (parte '+(i+1)+')':'')+'</a>';}).join('<br>')+'</div>':'')+
-      '<div class="fila" style="margin-top:10px"><button onclick="pdf(\''+l.lote+'\')">'+(l.pdf?'Generar otra vez':'Ver carnets y generar PDF')+'</button>'+
-      (l.pdf?'<button class="ok" onclick="impreso(\''+l.lote+'\')">Marcar como impreso</button>':'')+
-      (l.pdf?'<button class="sec" onclick="waImprenta(\''+esc(l.lote)+'\')">Enviar por WhatsApp</button>':'')+'</div></div>';   // 17-11: al grupo de imprenta
+function vLotes(){   // M 19-11: una tarjeta por ESCUELA (un solo PDF por escuela)
+  var L = D.lotes.filter(function(l){return ['TERMINADO','PDF GENERADO'].indexOf(l.estado)>=0 && mio(l.municipio);}), E = {}, orden = [];
+  L.forEach(function(l){ if(!E[l.escuela]){ E[l.escuela]=[]; orden.push(l.escuela); } E[l.escuela].push(l); });
+  orden.sort(function(a,b){ var ta=E[a].some(function(l){return l.estado==='TERMINADO';}), tb=E[b].some(function(l){return l.estado==='TERMINADO';}); return ta===tb ? (a<b?-1:1) : (ta?-1:1); });
+  var h = orden.length ? '' : '<div class="card"><div class="bien">No hay grupos esperando revisión.</div></div>';
+  h += orden.map(function(cod){
+    var G = E[cod], term = G.filter(function(l){return l.estado==='TERMINADO';}), gen = G.filter(function(l){return l.estado==='PDF GENERADO';});
+    var e = (D.escuelas||[]).filter(function(x){return String(x[0]).trim().toUpperCase()===String(cod).trim().toUpperCase();})[0];
+    var imp = D.lotes.filter(function(l){return l.escuela===cod && l.estado==='IMPRESO';}).length;
+    var ret = D.lotes.filter(function(l){return l.escuela===cod && l.tipo==='CORRECCION' && l.estado==='ABIERTO' && Number(l.cargados)>0;}).length;   // R1: retener la escuela completa
+    var urls = []; gen.forEach(function(l){ l.pdf.split('\n').forEach(function(u){ if(u && urls.indexOf(u)<0) urls.push(u); }); });
+    var total = G.reduce(function(a,l){return a+(Number(l.cargados)||0);},0);
+    return '<div class="card"><div class="fila" style="justify-content:space-between"><h2>'+esc(cod)+(e?' · '+esc(e[3]||e[2]):'')+'</h2><span class="chip '+(term.length?'warn':'ok')+'">'+(term.length?'POR REVISAR':'PDF GENERADO')+'</span></div>'+
+      '<div class="muted">'+esc(G[0].municipio)+' · '+G.length+' grupo'+(G.length>1?'s':'')+' · '+total+' carnet'+(total!==1?'s':'')+' (antes de quitar repetidos y correcciones)</div>'+
+      G.map(function(l){ return '<div class="muted" style="margin-top:4px">• '+(l.tipo==='CORRECCION'?'Corrección':'Grupo')+' de '+l.cargados+' · '+esc(l.estado)+' · '+esc(l.quien)+' · '+esc(l.cuando)+(l.revisado?' · PDF: '+esc(l.revisado):'')+'</div>'; }).join('')+
+      (ret?'<div class="err" style="margin-top:6px"><b>RETENIDA:</b> el director está corrigiendo y aún no termina. El PDF sale cuando pulse «Terminar correcciones y enviar».</div>':'')+
+      (imp?'<div class="aviso" style="margin-top:6px">Esta escuela ya tiene '+imp+' grupo(s) IMPRESO(s): el PDF lleva solo los nuevos y las correcciones.</div>':'')+
+      (gen.length && term.length?'<div class="aviso" style="margin-top:6px">Entran también '+gen.length+' grupo(s) con PDF ya generado. Si alguno ya se imprimió, márquelo impreso antes de generar.</div>':'')+
+      (urls.length?'<div style="margin-top:6px">'+urls.map(function(u,i){return '<a href="'+esc(u)+'" target="_blank">Abrir PDF guardado'+(urls.length>1?' ('+(i+1)+')':'')+'</a>';}).join('<br>')+'</div>':'')+
+      '<div class="fila" style="margin-top:10px"><button '+(ret?'disabled ':'')+'onclick="pdfEscuela(\''+esc(cod)+'\')">'+(term.length?'Ver carnets y generar PDF de la escuela':'Generar otra vez')+'</button>'+
+      (gen.length && !term.length && !ret?'<button class="ok" onclick="impresoEscuela(\''+esc(cod)+'\')">Marcar como impreso</button><button class="sec" onclick="waImprentaEscuela(\''+esc(cod)+'\')">Enviar por WhatsApp</button>':'')+'</div></div>';
   }).join('');
   var imp = D.lotes.filter(function(l){return l.estado==='IMPRESO';}).length;
   return h + '<p class="muted">Grupos ya impresos: '+imp+'</p>';
+}
+async function impresoEscuela(cod){
+  var G = D.lotes.filter(function(l){return l.escuela===cod && l.estado==='PDF GENERADO';});
+  if(!G.length || !confirm('¿Confirma que el PDF de '+cod+' ya se mandó a imprenta? ('+G.length+' grupo'+(G.length>1?'s':'')+')')) return;
+  cargando(); try{ for (var i=0;i<G.length;i++) D = await srv('marcarImpreso',K,G[i].lote); set(D); cerrarVelo(); }catch(e){ fallo(e); }
+}
+function waImprentaEscuela(cod){
+  var G = D.lotes.filter(function(l){return l.escuela===cod && l.estado==='PDF GENERADO' && l.pdf;}); if(!G.length) return;
+  var urls=[]; G.forEach(function(l){ l.pdf.split('\n').forEach(function(u){ if(u && urls.indexOf(u)<0) urls.push(u); }); });
+  var e = (D.escuelas||[]).filter(function(x){return x[0]===cod;})[0], m = String(G[0].revisado||'').match(/PDF de la escuela \((\d+) carnets\)/);
+  var n = m ? Number(m[1]) : G.reduce(function(a,l){return a+(Number(l.cargados)||0);},0);   // revisión M: el número real del PDF
+  if (m) urls = G[0].pdf.split('\n').filter(String);   // el PDF de la escuela (todos sus grupos tienen el mismo)
+  window.open('https://wa.me/?text='+encodeURIComponent(msgImprenta((G[0].municipio||'')+' - '+(e?(e[3]||e[2]):cod)+' - '+n+' carnets', urls)), '_blank', 'noopener');
+}
+// M 19-11 (Virginia 18-11 20:35 y 20:56): sin alerta «PIN NUEVO». En su lugar, el reporte del día: cuántas escuelas crearon su PIN.
+// Sale de la fecha del PIN en Escuelas (col. O: «cédula · aaaa-mm-dd hh:mm»). No cuenta las entradas (eso no se guarda).
+function vReporte(){
+  var dias = {}, hoy = D.hoy ? new Date(D.hoy+'T12:00:00') : new Date(), iso = function(d){ return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }, H = iso(hoy), hoyL = [];
+  (D.escuelas||[]).forEach(function(x){ var m = String(x[10]||'').match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/); if(!m || !mio(x[1])) return;
+    dias[m[1]] = (dias[m[1]]||0)+1; if (m[1]===H) hoyL.push([m[2], x[0], x[3]||x[2], x[1]]); });
+  hoyL.sort();
+  var h = '<div class="card"><h2>Reporte del día · '+H.split('-').reverse().join('/')+'</h2><div class="bien" style="font-size:20px">Hoy '+hoyL.length+' escuela'+(hoyL.length!==1?'s':'')+' crearon su PIN.</div>'+
+    hoyL.map(function(x){ return '<div class="muted">'+esc(x[0])+' · '+esc(x[1])+' · '+esc(x[2])+' ('+esc(x[3])+')</div>'; }).join('')+'</div>';
+  var lista = []; for (var i=1;i<=7;i++){ var d=new Date(hoy); d.setDate(d.getDate()-i); lista.push([iso(d), dias[iso(d)]||0]); }
+  return h + '<div class="card"><h2>Días anteriores</h2>'+lista.map(function(x){ return '<div class="persona"><div>'+x[0].split('-').reverse().join('/')+'</div><b>'+x[1]+'</b></div>'; }).join('')+
+    '<p class="muted">Cuenta las escuelas que crearon su PIN cada día (con «Solo mis municipios» marcado, solo las suyas).</p></div>';
 }
 // 17-11 (pedido de Virginia): PDF listo → botón «Enviar por WhatsApp». Abre WhatsApp con el mensaje listo (escuela, carnets
 // y enlace del PDF en Drive) y ella escoge el grupo de imprenta. No va a ningún número fijo.
@@ -302,6 +339,47 @@ async function pdf(lote){
     }
     D = await srv('panel', K); pintar(); window.LINKS_PDF = links;
     velo('<h2>PDF listo</h2><div class="bien">Quedó guardado en la carpeta «PDF PARA IMPRENTA».</div>'+
+      '<button class="ok full" style="margin:6px 0" onclick="enviarPdfListo()">Enviar por WhatsApp</button>'+PARTES.map(function(x,i){return '<button class="full" style="margin:6px 0" onclick="bajar('+i+')">Descargar '+esc(x[1])+'</button>';}).join('')+(revisar.length?'<div class="aviso"><b>Revise estas fotos antes de imprimir ('+revisar.length+'):</b><br>'+revisar.map(esc).join('<br>')+'</div>':'')+'<p class="muted">Revise cada carnet antes de mandarlo a la imprenta:</p><div class="fila" style="align-items:flex-start">'+thumbs.join('')+'</div><button class="full" style="margin-top:12px" onclick="cerrarVelo()">Cerrar</button>');
+  }catch(e){ fallo(e); }
+}
+
+// M 19-11 (Virginia 18-11): UN SOLO PDF POR ESCUELA. Igual que pdf(lote), pero con todos los grupos de la escuela que no están impresos.
+async function pdfEscuela(cod){
+  cargando('Preparando carnets…');
+  try{
+    var d = await srv('escuelaPdf', K, cod), grupos = d.lotes.map(function(x){return x.lote;});
+    if ((d.fotoAnterior||[]).length) return velo('<h2>Este PDF lo arma Claude</h2><div class="aviso">'+d.fotoAnterior.length+' carnet(s) de este grupo usan la foto del carnet anterior ('+esc(d.fotoAnterior.join(', '))+'). '+
+      'El sistema solo tiene una copia chica de esa foto y el carnet saldría borroso. Pídale a Claude el PDF COMPLETO de la escuela: lleva la foto original, con la misma nitidez.</div><button class="full" onclick="cerrarVelo()">Entendido</button>');   // 17-11
+    await CARNET.loadFonts(d.assets.fonts);
+    var bg={}; for (var g in d.assets.bg) bg[g]=await img(d.assets.bg[g]);
+    var inst={corto:d.escuela.corto, oficial:d.escuela.oficial, periodo:d.periodo};
+    var cv=document.createElement('canvas'), partes=[], doc=null, n=0, thumbs=[], revisar=[];
+    try{ $('barT').textContent='Cargando el preparador de fotos…'; await cargarPreparador(); }catch(e){ throw (/huella|no es el probado/.test(String(e)) ? String(e) : 'No se pudo cargar el preparador de fotos, así que NO se generó el PDF (saldría con la cara pequeña). Revise el internet y vuelva a intentar.'); }
+    for (var i=0;i<d.personas.length;i++){
+      var p=d.personas[i];
+      if (n===0) doc = await PDFLib.PDFDocument.create();
+      var foto = p.foto ? await img(await srv('fotoAdmin', K, p.foto)) : null, notas = [];
+      // 18-11 (versión L): encuadre, nitidez y tamaño exacto del marco (522 x 638) como la PC. Si falla, no se genera el PDF.
+      if (foto) { $('barT').textContent=(i+1)+' de '+d.personas.length+' · preparando la foto…'; await new Promise(function(r){ setTimeout(r, 30); }); var pf = await FOTO.preparar(foto, {w:522, h:638}); foto = pf.marco; notas = pf.notas.filter(function(t){ return /no se detectó la cara/.test(t); }); }   // 18-11 Virginia: sin avisos nuevos; solo si no hay cara
+      if (notas.length) revisar.push((i+1)+'. '+p.nombres+' '+p.apellidos+': '+notas.join('; '));
+      CARNET.render(cv, bg[CARNET.grupo(p.tipo)], {nombres:p.nombres, apellidos:p.apellidos, nombre:p.nombres+' '+p.apellidos, ci:p.nac+'-'+p.cedula, tipo:p.tipo, cargo:p.cargo}, inst, foto);
+      var jpg = cv.toDataURL('image/jpeg', 0.95);
+      thumbs.push('<figure style="margin:0"><img src="'+jpg+'" style="width:150px;border-radius:6px;box-shadow:0 2px 8px #0002"><figcaption class="muted" style="width:150px;font-size:12px">'+(i+1)+'. '+esc(p.nombres+' '+p.apellidos)+(notas.length?'<br><b style="color:#a12b2b">Revisar: '+esc(notas.join('; '))+'</b>':'')+'</figcaption></figure>');
+      var im = await doc.embedJpg(jpg);
+      var pg = doc.addPage([mmPt(62), mmPt(95)]); pg.drawImage(im, {x:0, y:0, width:mmPt(62), height:mmPt(95)});
+      n++; $('bar').style.width = Math.round(100*(i+1)/d.personas.length)+'%'; $('barT').textContent=(i+1)+' de '+d.personas.length;
+      if (n===POR_PDF || i===d.personas.length-1){ partes.push(await doc.saveAsBase64({dataUri:true})); n=0; }
+    }
+    var base = (d.escuela.municipio+' - '+d.escuela.corto+' - '+d.personas.length+' carnets'+(d.tipo==='CORRECCION'?' - CORRECCION':'')).replace(/[\\/:*?"<>|]/g,'');
+    var links=[]; window.PARTES=[];
+    for (var j=0;j<partes.length;j++){
+      var nom = base + (partes.length>1?' - parte '+(j+1)+' de '+partes.length:'') + '.pdf';
+      $('barT').textContent='Guardando en Drive '+(j+1)+' de '+partes.length+'…';
+      links.push(await srv('guardarPdfEscuela', K, cod, grupos, partes[j], nom, j+1, d.personas.length)); PARTES.push([partes[j],nom]);
+    }
+    D = await srv('panel', K); pintar(); window.LINKS_PDF = links;
+    var avisosM = ((d.repetidos||[]).length?'<div class="aviso"><b>Misma cédula en dos personas</b> (salen las dos, revise cuál está mal): '+d.repetidos.map(esc).join('; ')+'</div>':'')+(d.conHechos && !d.impresos?'<div class="aviso">Esta escuela tiene carnets ya hechos (en «Carnets ya hechos»): este PDF lleva solo lo que está en el sistema. Revise con su listado si ya estaba impresa.</div>':'');   // revisión M (R8, R9)
+    velo('<h2>PDF listo</h2><div class="bien">Quedó guardado en la carpeta «PDF PARA IMPRENTA».</div>'+avisosM+
       '<button class="ok full" style="margin:6px 0" onclick="enviarPdfListo()">Enviar por WhatsApp</button>'+PARTES.map(function(x,i){return '<button class="full" style="margin:6px 0" onclick="bajar('+i+')">Descargar '+esc(x[1])+'</button>';}).join('')+(revisar.length?'<div class="aviso"><b>Revise estas fotos antes de imprimir ('+revisar.length+'):</b><br>'+revisar.map(esc).join('<br>')+'</div>':'')+'<p class="muted">Revise cada carnet antes de mandarlo a la imprenta:</p><div class="fila" style="align-items:flex-start">'+thumbs.join('')+'</div><button class="full" style="margin-top:12px" onclick="cerrarVelo()">Cerrar</button>');
   }catch(e){ fallo(e); }
 }

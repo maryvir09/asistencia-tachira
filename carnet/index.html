@@ -202,8 +202,9 @@ function tarjetaLote(l){
     var est = p.estado==='POR APROBAR' ? '<span class="chip warn">Esperando aprobación</span>' : '';
     var corr = (abierto && p.problema) ? '<div class="aviso" style="margin:6px 0 0;padding:6px 10px">'+esc(p.problema)+'</div>' : '';   // 17-11: lo que el director debe corregir
     h += '<div class="persona"><div><b>'+esc(p.nombres+' '+p.apellidos)+'</b><small>'+esc(p.nac+'-'+p.cedula+' · '+p.cargo)+'</small> '+est+corr+'</div>' +
-         (abierto ? '<div class="fila"><button class="sec" onclick="editar('+p.fila+')">Ver / editar</button><button class="sec" onclick="quitar('+p.fila+')">No trabaja aquí</button></div>' : '<button class="sec" onclick="verCarnet('+p.fila+')">Ver</button>') + '</div>';
+         (abierto ? '<div class="fila"><button class="sec" onclick="editar('+p.fila+')">Ver / editar</button><button class="sec" onclick="quitar('+p.fila+')">No trabaja aquí</button></div>' : botonesEnviada(l, p)) + '</div>';
   });
+  if (ENVIADOS.indexOf(l.estado)>=0) h += quitadasDe(l);   // M 19-11
   if (abierto) h += avisoRechazados(l, 'Corrija lo indicado y cárguela de nuevo con «Agregar persona» en este mismo grupo.');
   if (l.tipo!=='CORRECCION' && (abierto || l.estado==='PAGO RECHAZADO')) {   // 17-11: pagar más carnets para este mismo grupo
     var sug = l.estado==='PAGO RECHAZADO' ? ps.length : Math.max(ps.length - l.cupos, 0);
@@ -218,6 +219,42 @@ function tarjetaLote(l){
     if (!listo) h += '<p class="muted" style="margin:6px 0 0">Se activa cuando el pago esté confirmado, estén cargados los '+l.cupos+' y no haya nada esperando aprobación.</p>';
   }
   return h + '</div>';
+}
+
+// ---------------------------------------------------------------- M (19-11): TODO ABIERTO
+// Pedido de Virginia (18-11): en los grupos ya enviados (aunque estén impresos) la escuela puede «Corregir» y decir «No trabaja aquí».
+// La corrección aparece arriba, en «Correcciones pendientes», y se envía con «Terminar correcciones y enviar».
+var ENVIADOS = ['TERMINADO','PDF GENERADO','IMPRESO'];
+function estadoCorreccion(p){   // '' | 'ABIERTA' | 'EN REVISION' | 'ENVIADA'
+  var c = D.personas.filter(function(x){return x.sisDe===p.fila;}), est = '';
+  c.forEach(function(x){ var L = D.lotes.filter(function(l){return l.lote===x.lote;})[0]; if(!L) return;
+    if (L.estado==='ABIERTO') est = 'ABIERTA'; else if (L.estado==='TERMINADO' && est!=='ABIERTA') est = 'EN REVISION'; else if (!est) est = 'ENVIADA'; });
+  return est;
+}
+function botonesEnviada(l, p){
+  var ver = '<button class="sec" onclick="verCarnet('+p.fila+')">Ver</button>';
+  if (ENVIADOS.indexOf(l.estado)<0) return ver;
+  var c = estadoCorreccion(p), chip = c==='ABIERTA' ? '<span class="chip warn">En corrección (arriba)</span>' : c==='EN REVISION' ? '<span class="chip ok">Corrección en revisión</span>' : c==='ENVIADA' ? '<span class="chip ok">Corrección enviada</span>' : '';
+  return '<div class="fila">'+chip+ver+(c==='ABIERTA'||c==='EN REVISION' ? '' : '<button class="sec" onclick="corregirEnviada('+p.fila+')">Corregir</button>')+
+         '<button class="sec" onclick="quitarEnviada('+p.fila+')">No trabaja aquí</button></div>';
+}
+function quitadasDe(l){
+  return (D.quitadas||[]).filter(function(q){return q.lote===l.lote;}).map(function(q){
+    return '<div class="persona"><div><b>'+esc(q.nombres+' '+q.apellidos)+'</b><small>'+esc(q.nac+'-'+q.cedula+' · '+q.cargo)+'</small> <span class="chip bad">No trabaja aquí</span></div>'+
+           '<button class="sec" onclick="accionEnviada(\'devolverEnviada\','+q.fila+',\'Guardando…\')">Sí trabaja aquí</button></div>';
+  }).join('');
+}
+function nombreFila(f){ var p = D.personas.filter(function(x){return x.fila===f;})[0]; return p ? p.nombres+' '+p.apellidos : ''; }
+function corregirEnviada(f){
+  velo('<h2>Corregir carnet</h2><p>Se abrirá la corrección de <b>'+esc(nombreFila(f))+'</b> en «Correcciones pendientes». Allí corrige los datos y lo envía.</p><p class="muted">La foto se queda igual; súbala de nuevo solo si la foto es el error. Si el carnet ya se imprimió, la reimpresión tiene costo.</p><div class="fila" style="margin-top:12px"><button class="sec" onclick="cerrarVelo()">Cancelar</button><button class="ok" onclick="accionEnviada(\'corregirEnviada\','+f+',\'Abriendo la corrección…\')">Sí, corregir</button></div>');
+}
+function quitarEnviada(f){
+  velo('<h2>No trabaja aquí</h2><p>¿<b>'+esc(nombreFila(f))+'</b> <b>no trabaja</b> en su escuela?</p><p class="muted">Si se equivoca, puede deshacerlo con «Sí trabaja aquí».</p><div class="fila" style="margin-top:12px"><button class="sec" onclick="cerrarVelo()">Cancelar</button><button class="ok" onclick="accionEnviada(\'quitarEnviada\','+f+',\'Guardando…\')">Sí, no trabaja aquí</button></div>');
+}
+async function accionEnviada(fn, f, msg){
+  cargando(msg);
+  try{ refrescar(await srv(fn, PARAMS.e, PARAMS.k, f)); cerrarVelo(); if (fn==='corregirEnviada') window.scrollTo(0,0); }
+  catch(e){ fallo(e); }
 }
 
 // Personas que la coordinación no aprobó, con el motivo (D.rechazados no existe con el servidor viejo).
