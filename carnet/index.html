@@ -179,7 +179,8 @@ function personasDe(lote){ return D.personas.filter(function(p){return p.lote===
 
 function tarjetaLote(l){
   var ps = personasDe(l.lote), abierto = ['PAGO EN ESPERA','ABIERTO'].indexOf(l.estado)>=0;
-  var h = '<div class="card"><div class="fila" style="justify-content:space-between"><h2>Grupo de '+l.cupos+' carnet'+(l.cupos>1?'s':'')+'</h2>'+chipLote(l)+'</div>';
+  var h = '<div class="card"><div class="fila" style="justify-content:space-between"><h2>'+(l.libresDe?'Cupos pagados libres: '+l.cupos:'Grupo de '+l.cupos+' carnet'+(l.cupos>1?'s':''))+'</h2>'+chipLote(l)+'</div>';
+  if (l.libresDe) h += '<p class="muted" style="margin:4px 0">Estos carnets ya están pagados (sobraron de un grupo que usted envió). Cargue aquí a las personas que le falten.</p>';   // N2 (20-11)
   var et={'EN ESPERA':'<span class="chip warn">en espera</span>','CONFIRMADO':'<span class="chip ok">confirmado</span>','RECHAZADO':'<span class="chip bad">rechazado</span>','ANULADO':'<span class="chip">anulado</span>'};
   var esComp = function(t){ return /Complemento C\d+/.test(t.nota||''); };   // 17-11 noche: complemento de pago
   var porReemplazar = (l.pagos||[]).filter(function(t){ return t.estado==='RECHAZADO' && !t.reemplazada && l.estado==='PAGO EN ESPERA' && !esComp(t); });
@@ -210,13 +211,15 @@ function tarjetaLote(l){
     var sug = l.estado==='PAGO RECHAZADO' ? ps.length : Math.max(ps.length - l.cupos, 0);
     h += '<button class="sec full" style="margin-top:10px" onclick="formPago(\''+esc(l.lote)+'\','+sug+')">'+(l.estado==='PAGO RECHAZADO'?'Pagar este grupo otra vez':'Pagar más carnets para este grupo')+'</button>';
   }
-  if (l.tipo!=='CORRECCION' && l.estado!=='PAGO RECHAZADO' && !/SIN PAGO/i.test(String(l.pago||'')))   // 17-11 noche: diferencia que faltó (p. ej. 1.000 o 2.000 Bs por el cambio de precio)
+  if (l.tipo!=='CORRECCION' && !l.libresDe && l.estado!=='PAGO RECHAZADO' && !/SIN PAGO/i.test(String(l.pago||'')))   // 17-11 noche: diferencia que faltó (p. ej. 1.000 o 2.000 Bs por el cambio de precio)
     h += '<button class="sec full" style="margin-top:8px" onclick="formPago(\''+esc(l.lote)+'\',0,true)">Pagar una diferencia (complemento)</button>';
   if (abierto && ps.length < l.cupos) h += '<button class="full" style="margin-top:10px" onclick="nueva(\''+l.lote+'\')">+ Agregar persona ('+(l.cupos-ps.length)+' cupo'+(l.cupos-ps.length>1?'s':'')+' libre'+(l.cupos-ps.length>1?'s':'')+')</button>';
   if (abierto) {
-    var listo = l.estado==='ABIERTO' && ps.length===l.cupos && !ps.some(function(p){return p.estado==='POR APROBAR';});
+    // N2 (Virginia 20-11): se puede enviar con menos personas que los cupos pagados; los que sobran quedan en un grupo aparte.
+    var listo = l.estado==='ABIERTO' && ps.length>=1 && ps.length<=l.cupos && !ps.some(function(p){return p.estado==='POR APROBAR';});
     h += '<button class="full ok" style="margin-top:10px" '+(listo?'':'disabled')+' onclick="terminar(\''+l.lote+'\')">Terminar y enviar a la coordinación</button>';
-    if (!listo) h += '<p class="muted" style="margin:6px 0 0">Se activa cuando el pago esté confirmado, estén cargados los '+l.cupos+' y no haya nada esperando aprobación.</p>';
+    if (!listo) h += '<p class="muted" style="margin:6px 0 0">Se activa cuando el pago esté confirmado, haya al menos una persona cargada, no haya personas de más y no haya nada esperando aprobación.</p>';
+    else if (ps.length < l.cupos) h += '<p class="muted" style="margin:6px 0 0">Si envía ahora, los '+(l.cupos-ps.length)+' carnet'+(l.cupos-ps.length>1?'s':'')+' pagado'+(l.cupos-ps.length>1?'s':'')+' que sobran quedan guardados en un grupo «Cupos pagados libres» para cargarlos después.</p>';
   }
   return h + '</div>';
 }
@@ -565,12 +568,13 @@ async function nuevaFoto(){
   var prob = revisarFoto(r);
   P.fotoData = r.url; P.fotoId=''; P.fotoImg = await img(r.url); P.excepcionFoto=''; P.fotoAnterior=false;
   if (prob.length) {
-    $('fFotoMsg').innerHTML='<div class="err">'+prob.map(esc).join('<br>')+'</div><button class="sec" onclick="pedirExcepcion()">Es la única foto que hay: pedir excepción a la coordinación</button>';
+    $('fFotoMsg').innerHTML='<div class="err">'+prob.map(esc).join('<br>')+'</div><button class="sec" onclick="pedirExcepcion()">Dejar esta foto bajo responsabilidad de la escuela</button>';
     P.fotoRechazo = prob.join(' ');
   } else { $('fFotoMsg').innerHTML='<div class="bien">Foto aceptada.</div>'; P.fotoRechazo=''; }
   vistaPrevia();
 }
-function pedirExcepcion(){ P.excepcionFoto = P.fotoRechazo; P.fotoRechazo=''; $('fFotoMsg').innerHTML='<div class="aviso">Se enviará a la coordinación para aprobar. Este carnet no se imprime hasta que la aprueben.</div>'; }
+// N4 (Virginia 20-11 09:35): la foto que no cumple queda bajo responsabilidad de la escuela; ya no la aprueba la coordinación.
+function pedirExcepcion(){ P.excepcionFoto = P.fotoRechazo; P.fotoRechazo=''; $('fFotoMsg').innerHTML='<div class="aviso"><b>Esta foto no cumple los estándares establecidos.</b> Si la deja, es responsabilidad de la escuela que no salga bien en el carnet, y la reimpresión tendrá costo.</div>'; }
 
 function vistaPrevia(){
   var cv=$('cv'); if(!cv) return;
@@ -580,12 +584,26 @@ function vistaPrevia(){
   CARNET.render(cv, BG[CARNET.grupo(tipo)], p, {corto:D.escuela.corto, oficial:D.escuela.oficial, periodo:D.periodo}, P.fotoImg||null);
 }
 
+function palabrasRepetidas(n, a){   // N3: palabras (de 3 letras o más, sin «DE», «DEL», «LA»…) que están en nombres y en apellidos
+  var no={DE:1,DEL:1,LA:1,LAS:1,LOS:1,Y:1,EL:1,SAN:1,SANTA:1};
+  var w=function(s){ return String(s||'').toUpperCase().replace(/Ñ/g,'#').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/#/g,'Ñ').match(/[A-ZÑ]+/g)||[]; };   // la Ñ no es N
+  var b={}, out=[]; w(a).forEach(function(x){ b[x]=1; });
+  w(n).forEach(function(x){ if (x.length>=3 && !no[x] && b[x] && out.indexOf(x)<0) out.push(x); });
+  return out;
+}
 async function guardar(){
   leer();
   var err=function(m){$('fErr').innerHTML='<div class="err">'+esc(m)+'</div>'; aviso(m);};
-  if (P.fotoRechazo) return err('La foto no sirve. Suba otra o pida una excepción a la coordinación.');
+  if (P.fotoRechazo) return err('La foto no cumple los estándares. Suba otra, o toque «Dejar esta foto bajo responsabilidad de la escuela».');
   if (!P.fotoData && !P.fotoId) return err('Falta la foto.');
   var cargo=cargoFinal(); if(!cargo) return err(P.cargoBase==='DOCENTE ESPECIALISTA'?'Elija el área del especialista.':'Elija el cargo.');
+  var rep = palabrasRepetidas(P.nombres, P.apellidos), firma = (P.nombres||'')+'|'+(P.apellidos||'');
+  if (rep.length && P.nombresVistos !== firma) {   // N3 (Virginia 20-11): solo aviso; la segunda vez guarda igual
+    P.nombresVistos = firma;
+    return velo('<h2>Revise el nombre</h2><div class="aviso">La palabra <b>'+esc(rep.join(', '))+'</b> aparece en <b>Nombres</b> y también en <b>Apellidos</b>. Parece que el nombre quedó mezclado.</div>'+
+      '<p>En <b>Nombres</b> escriba solo los nombres y en <b>Apellidos</b> solo los apellidos. Si está bien así (por ejemplo, un apellido que también es nombre), puede guardar igual.</p>'+
+      '<div class="fila" style="margin-top:12px"><button class="sec" onclick="cerrarVelo()">Corregir</button><button class="ok" onclick="cerrarVelo();guardar()">Está bien, guardar igual</button></div>');
+  }
   var d={fila:P.fila||'', lote:P.lote, nac:P.nac, cedula:P.cedula, nombres:P.nombres, apellidos:P.apellidos, genero:P.genero, tipo:P.tipo,
          cargo:cargo, area:P.area||'', atipico:P.atipico, motivo:P.motivo, cargoOtro:P.cargoOtro, foto:P.fotoData||'', fotoId:P.fotoData?'':P.fotoId, excepcionFoto:P.excepcionFoto||'', fotoAnterior:!!P.fotoAnterior};
   cargando();
@@ -607,8 +625,9 @@ async function confirmarQuitar(fila){
 
 // ---------------------------------------------------------------- terminar
 function terminar(lote){
-  var n = personasDe(lote).length;
+  var n = personasDe(lote).length, L = D.lotes.filter(function(x){return x.lote===lote;})[0], sob = L && L.tipo!=='CORRECCION' ? L.cupos - n : 0;
   velo('<h2>Terminar y enviar</h2><p>Se enviarán <b>'+n+' carnet(s)</b> a la coordinación para imprimir. Después de enviar ya no podrá cambiarlos.</p>'+
+   (sob>0 ? '<div class="aviso">Usted pagó '+L.cupos+' carnets y está enviando '+n+'. Los <b>'+sob+'</b> que sobran quedan en un grupo «Cupos pagados libres» para cargarlos después, sin pagar de nuevo.</div>' : '')+
    '<label style="font-weight:500"><input type="checkbox" id="tOk" style="width:auto"> Revisé cada carnet: nombres, apellidos, cédulas, cargos y fotos están correctos.</label>'+
    '<label>Su nombre y apellido</label><input id="tNom"><label>Su cédula</label><input id="tCed" inputmode="numeric">'+
    '<div id="tErr"></div><div class="fila" style="margin-top:12px"><button class="sec" onclick="cerrarVelo()">Cancelar</button><button class="ok" onclick="confirmarTerminar(\''+lote+'\')">Enviar</button></div>');
