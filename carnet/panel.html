@@ -312,9 +312,11 @@ function mmPt(mm){ return mm*72/25.4; }
 // Si la foto es un capture del teléfono (alta y con franjas oscuras arriba y abajo), se recorta solo la parte de la foto
 // antes de encuadrar la cara. Cualquier otra foto pasa igual que antes.
 async function recortarCaptura_(im){
+  recortarCaptura_.dudosa = false;   // Q 21-11: true si la foto es tan alta como un capture y no se pudo recortar (se avisa al final)
   try{ if (im.decode) await im.decode(); }catch(e){}   // que la foto esté lista antes de medirla
   var W=im.naturalWidth||im.width, H=im.naturalHeight||im.height;
   if (!W || !H || H/W < 1.9) return im;
+  recortarCaptura_.dudosa = true;
   var c=document.createElement('canvas'), s=Math.min(1,400/W); c.width=Math.round(W*s); c.height=Math.round(H*s);
   var g=c.getContext('2d'); g.drawImage(im,0,0,c.width,c.height); var d=g.getImageData(0,0,c.width,c.height).data;
   var osc=[]; for (var y=0;y<c.height;y++){ var t=0; for (var x=0;x<c.width;x++){ var i=(y*c.width+x)*4; t+=(d[i]+d[i+1]+d[i+2])/3; } osc.push(t/c.width<45); }
@@ -322,6 +324,7 @@ async function recortarCaptura_(im){
   var best=[0,0], ini=-1; for (var y2=0;y2<=c.height;y2++){ if (y2<c.height && !osc[y2]){ if(ini<0) ini=y2; } else if (ini>=0){ if (y2-ini>best[1]-best[0]) best=[ini,y2]; ini=-1; } }
   var y0=Math.round(best[0]/s), y1=Math.round(best[1]/s);
   if (y1-y0 < H*0.25 || y1-y0 > H*0.92) return im;
+  recortarCaptura_.dudosa = false;
   var o=document.createElement('canvas'); o.width=W; o.height=y1-y0; o.getContext('2d').drawImage(im,0,y0,W,y1-y0,0,0,W,y1-y0);
   return o;
 }
@@ -370,7 +373,8 @@ async function pdf(lote){
       if (n===0) doc = await PDFLib.PDFDocument.create();
       var foto = p.foto ? await img(await FOTOS_PEDIDAS.usar(p.foto)) : null, notas = [];   // O 20-11: la foto ya viene pedida de a 4
       // 18-11 (versión L): encuadre, nitidez y tamaño exacto del marco (522 x 638) como la PC. Si falla, no se genera el PDF.
-      if (foto) { $('barT').textContent=(i+1)+' de '+d.personas.length+' · preparando la foto…'; await new Promise(function(r){ setTimeout(r, 30); }); var pf = await FOTO.preparar(await recortarCaptura_(foto), {w:522, h:638}); foto = pf.marco; notas = pf.notas.filter(function(t){ return /no se detectó la cara/.test(t); }); }   // 18-11 Virginia: sin avisos nuevos; solo si no hay cara
+      if (foto) { $('barT').textContent=(i+1)+' de '+d.personas.length+' · preparando la foto…'; await new Promise(function(r){ setTimeout(r, 30); }); var rc = await recortarCaptura_(foto), dud = recortarCaptura_.dudosa; var pf = await FOTO.preparar(rc, {w:522, h:638}); foto = pf.marco; notas = pf.notas.filter(function(t){ return /no se detectó la cara/.test(t); }); if (dud) notas.push('parece un capture y no se pudo recortar'); }   // 18-11 Virginia: sin avisos nuevos; solo si no hay cara
+      if (p.fotoAnterior) notas.push('usa la foto del carnet anterior (copia del sistema)');   // Q 21-11: se repite el aviso al final
       if (notas.length) revisar.push((i+1)+'. '+p.nombres+' '+p.apellidos+': '+notas.join('; '));
       CARNET.render(cv, bg[CARNET.grupo(p.tipo)], {nombres:p.nombres, apellidos:p.apellidos, nombre:p.nombres+' '+p.apellidos, ci:p.nac+'-'+p.cedula, tipo:p.tipo, cargo:p.cargo}, inst, foto);
       var jpg = cv.toDataURL('image/jpeg', 0.95);
@@ -411,7 +415,8 @@ async function pdfEscuela(cod){
       if (n===0) doc = await PDFLib.PDFDocument.create();
       var foto = p.foto ? await img(await FOTOS_PEDIDAS.usar(p.foto)) : null, notas = [];   // O 20-11: la foto ya viene pedida de a 4
       // 18-11 (versión L): encuadre, nitidez y tamaño exacto del marco (522 x 638) como la PC. Si falla, no se genera el PDF.
-      if (foto) { $('barT').textContent=(i+1)+' de '+d.personas.length+' · preparando la foto…'; await new Promise(function(r){ setTimeout(r, 30); }); var pf = await FOTO.preparar(await recortarCaptura_(foto), {w:522, h:638}); foto = pf.marco; notas = pf.notas.filter(function(t){ return /no se detectó la cara/.test(t); }); }   // 18-11 Virginia: sin avisos nuevos; solo si no hay cara
+      if (foto) { $('barT').textContent=(i+1)+' de '+d.personas.length+' · preparando la foto…'; await new Promise(function(r){ setTimeout(r, 30); }); var rc = await recortarCaptura_(foto), dud = recortarCaptura_.dudosa; var pf = await FOTO.preparar(rc, {w:522, h:638}); foto = pf.marco; notas = pf.notas.filter(function(t){ return /no se detectó la cara/.test(t); }); if (dud) notas.push('parece un capture y no se pudo recortar'); }   // 18-11 Virginia: sin avisos nuevos; solo si no hay cara
+      if (p.fotoAnterior) notas.push('usa la foto del carnet anterior (copia del sistema)');   // Q 21-11: se repite el aviso al final
       if (notas.length) revisar.push((i+1)+'. '+p.nombres+' '+p.apellidos+': '+notas.join('; '));
       CARNET.render(cv, bg[CARNET.grupo(p.tipo)], {nombres:p.nombres, apellidos:p.apellidos, nombre:p.nombres+' '+p.apellidos, ci:p.nac+'-'+p.cedula, tipo:p.tipo, cargo:p.cargo}, inst, foto);
       var jpg = cv.toDataURL('image/jpeg', 0.95);
