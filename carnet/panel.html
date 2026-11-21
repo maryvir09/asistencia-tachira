@@ -316,7 +316,8 @@ function mmPt(mm){ return mm*72/25.4; }
 // (vacía, dañada o de iPhone HEIC), el PDF se detiene igual que antes, pero el mensaje dice de QUIÉN es la foto.
 async function fotoDe_(p, pedidas){
   var quien = (p.nombres+' '+p.apellidos).trim()+' (C.I. '+(p.nac?p.nac+'-':'')+p.cedula+')';
-  var src; try{ src = await pedidas.usar(p.foto); }catch(e){ throw 'No se pudo traer del sistema la foto de '+quien+'. Revise el internet y vuelva a intentar. No se generó el PDF.'; }
+  var src; try{ src = await pedidas.usar(p.foto); }catch(e){ throw 'No se pudo traer del sistema la foto de '+quien+'. Motivo: '+String(e)+' No se generó el PDF.'; }   // revisión R: se muestra el motivo real (internet, permiso, foto inexistente…)
+  if (!src || !/^data:image\/[^;]+;base64,./.test(String(src))) throw 'La foto de '+quien+' llegó VACÍA del sistema (el archivo no tiene imagen). Pídale al director que la suba de nuevo, o avísele a Claude. No se generó el PDF.';
   try{ return await img(src); }
   catch(e){ throw 'No se pudo abrir la foto de '+quien+'. Puede estar vacía, dañada o ser de iPhone (HEIC). Pídale al director que la suba de nuevo (foto normal JPG), o avísele a Claude. No se generó el PDF.'; }
 }
