@@ -304,23 +304,73 @@ async function enviarPdfListo(){
 async function impreso(lote){ if(!confirm('¿Confirma que este grupo ya se mandó a imprenta?')) return; cargando(); try{ set(await srv('marcarImpreso',K,lote)); cerrarVelo(); }catch(e){ fallo(e); } }
 
 function mmPt(mm){ return mm*72/25.4; }
+// O 20-11 (Virginia: «pasar de 8 minutos a 4»): pide las fotos de 4 en 4, como mucho 8 por delante del carnet que se está armando.
+// Mismas fotos, mismo preparador y mismo dibujo: solo cambia CUÁNDO se pide cada foto.
+// Si una foto pedida por adelantado falla, se pide otra vez sola (como antes); si vuelve a fallar, el PDF falla igual que antes.
+// Si el PDF se corta, los pedidos se detienen solos (nadie pide fotos durante 60 s).
+// P 21-11 (Virginia: «la foto sirve, pero en el carnet va solo la foto, no el capture»).
+// Si la foto es un capture del teléfono (alta y con franjas oscuras arriba y abajo), se recorta solo la parte de la foto
+// antes de encuadrar la cara. Cualquier otra foto pasa igual que antes.
+async function recortarCaptura_(im){
+  try{ if (im.decode) await im.decode(); }catch(e){}   // que la foto esté lista antes de medirla
+  var W=im.naturalWidth||im.width, H=im.naturalHeight||im.height;
+  if (!W || !H || H/W < 1.9) return im;
+  var c=document.createElement('canvas'), s=Math.min(1,400/W); c.width=Math.round(W*s); c.height=Math.round(H*s);
+  var g=c.getContext('2d'); g.drawImage(im,0,0,c.width,c.height); var d=g.getImageData(0,0,c.width,c.height).data;
+  var osc=[]; for (var y=0;y<c.height;y++){ var t=0; for (var x=0;x<c.width;x++){ var i=(y*c.width+x)*4; t+=(d[i]+d[i+1]+d[i+2])/3; } osc.push(t/c.width<45); }
+  if (!(osc[0] && osc[c.height-1])) return im;
+  var best=[0,0], ini=-1; for (var y2=0;y2<=c.height;y2++){ if (y2<c.height && !osc[y2]){ if(ini<0) ini=y2; } else if (ini>=0){ if (y2-ini>best[1]-best[0]) best=[ini,y2]; ini=-1; } }
+  var y0=Math.round(best[0]/s), y1=Math.round(best[1]/s);
+  if (y1-y0 < H*0.25 || y1-y0 > H*0.92) return im;
+  var o=document.createElement('canvas'); o.width=W; o.height=y1-y0; o.getContext('2d').drawImage(im,0,y0,W,y1-y0,0,0,W,y1-y0);
+  return o;
+}
+function pedirFotosDe4_(personas){
+  var ids=[], pos=Object.create(null), prom=Object.create(null), k=0, hasta=8, ultimo=Date.now();
+  personas.forEach(function(p){ if (p.foto && !(p.foto in pos)) { pos[p.foto]=ids.length; ids.push(p.foto); } });
+  async function obrero(){
+    while (k<ids.length){
+      if (k>=hasta){ if (Date.now()-ultimo>60000) return; await new Promise(function(r){ setTimeout(r,150); }); continue; }
+      var id=ids[k++]; prom[id]=srv('fotoAdmin', K, id); prom[id].catch(function(){}); try{ await prom[id]; }catch(e){}
+    }
+  }
+  for (var w=0; w<4; w++) obrero();
+  return { usar: async function(id){
+    ultimo=Date.now(); if (id in pos) hasta=Math.max(hasta, pos[id]+9);
+    var pr=prom[id]; delete prom[id];   // revisión O: se suelta la foto ya usada (memoria); si se repite, se pide otra vez como antes
+    if (!pr) return srv('fotoAdmin', K, id);
+    try{ return await pr; }catch(e){ return srv('fotoAdmin', K, id); }
+  } };
+}
+// P-A 21-11 (Virginia: «por lo menos ella genera el enlace»). Antes, si un carnet usaba la foto del carnet anterior,
+// el panel se detenía y había que pedirle el PDF a Claude. Ahora avisa en rojo, pide confirmar y genera con la copia del sistema.
+function confirmarFotoAnterior_(nombres){
+  return new Promise(function(resolver){
+    window.__fotoAntResp = function(si){ window.__fotoAntResp = null; resolver(si); };
+    velo('<h2>Revise estas fotos</h2><div class="aviso" style="background:var(--badbg);color:var(--bad)"><b>'+nombres.length+' carnet(s) usan la foto del carnet anterior:</b> '+esc(nombres.join(', '))+
+      '.<br>El sistema solo tiene una copia más chica de esa foto: puede salir menos nítida. Mire esas fotos en el PDF antes de mandarlo a imprimir.</div>'+
+      '<button class="ok full" style="margin:6px 0" onclick="__fotoAntResp(true)">Entendido, generar el PDF</button>'+
+      '<button class="sec full" style="margin:6px 0" onclick="__fotoAntResp(false)">Cancelar</button>');
+  });
+}
 async function pdf(lote){
   cargando('Preparando carnets…');
   try{
     var d = await srv('lotePdf', K, lote);
-    if ((d.fotoAnterior||[]).length) return velo('<h2>Este PDF lo arma Claude</h2><div class="aviso">'+d.fotoAnterior.length+' carnet(s) de este grupo usan la foto del carnet anterior ('+esc(d.fotoAnterior.join(', '))+'). '+
-      'El sistema solo tiene una copia chica de esa foto y el carnet saldría borroso. Pídale a Claude el PDF COMPLETO de la escuela: lleva la foto original, con la misma nitidez.</div><button class="full" onclick="cerrarVelo()">Entendido</button>');   // 17-11
+    if ((d.fotoAnterior||[]).length && !(await confirmarFotoAnterior_(d.fotoAnterior))) return cerrarVelo();   // P-A 21-11 (Virginia: que Rossy genere sola; antes aquí se detenía)
+    cargando('Preparando carnets…');
     await CARNET.loadFonts(d.assets.fonts);
     var bg={}; for (var g in d.assets.bg) bg[g]=await img(d.assets.bg[g]);
     var inst={corto:d.escuela.corto, oficial:d.escuela.oficial, periodo:d.periodo};
     var cv=document.createElement('canvas'), partes=[], doc=null, n=0, thumbs=[], revisar=[];
     try{ $('barT').textContent='Cargando el preparador de fotos…'; await cargarPreparador(); }catch(e){ throw (/huella|no es el probado/.test(String(e)) ? String(e) : 'No se pudo cargar el preparador de fotos, así que NO se generó el PDF (saldría con la cara pequeña). Revise el internet y vuelva a intentar.'); }
+    var FOTOS_PEDIDAS = pedirFotosDe4_(d.personas);   // O 20-11 (Virginia: «de 8 minutos a 4»)
     for (var i=0;i<d.personas.length;i++){
       var p=d.personas[i];
       if (n===0) doc = await PDFLib.PDFDocument.create();
-      var foto = p.foto ? await img(await srv('fotoAdmin', K, p.foto)) : null, notas = [];
+      var foto = p.foto ? await img(await FOTOS_PEDIDAS.usar(p.foto)) : null, notas = [];   // O 20-11: la foto ya viene pedida de a 4
       // 18-11 (versión L): encuadre, nitidez y tamaño exacto del marco (522 x 638) como la PC. Si falla, no se genera el PDF.
-      if (foto) { $('barT').textContent=(i+1)+' de '+d.personas.length+' · preparando la foto…'; await new Promise(function(r){ setTimeout(r, 30); }); var pf = await FOTO.preparar(foto, {w:522, h:638}); foto = pf.marco; notas = pf.notas.filter(function(t){ return /no se detectó la cara/.test(t); }); }   // 18-11 Virginia: sin avisos nuevos; solo si no hay cara
+      if (foto) { $('barT').textContent=(i+1)+' de '+d.personas.length+' · preparando la foto…'; await new Promise(function(r){ setTimeout(r, 30); }); var pf = await FOTO.preparar(await recortarCaptura_(foto), {w:522, h:638}); foto = pf.marco; notas = pf.notas.filter(function(t){ return /no se detectó la cara/.test(t); }); }   // 18-11 Virginia: sin avisos nuevos; solo si no hay cara
       if (notas.length) revisar.push((i+1)+'. '+p.nombres+' '+p.apellidos+': '+notas.join('; '));
       CARNET.render(cv, bg[CARNET.grupo(p.tipo)], {nombres:p.nombres, apellidos:p.apellidos, nombre:p.nombres+' '+p.apellidos, ci:p.nac+'-'+p.cedula, tipo:p.tipo, cargo:p.cargo}, inst, foto);
       var jpg = cv.toDataURL('image/jpeg', 0.95);
@@ -348,19 +398,20 @@ async function pdfEscuela(cod){
   cargando('Preparando carnets…');
   try{
     var d = await srv('escuelaPdf', K, cod), grupos = d.lotes.map(function(x){return x.lote;});
-    if ((d.fotoAnterior||[]).length) return velo('<h2>Este PDF lo arma Claude</h2><div class="aviso">'+d.fotoAnterior.length+' carnet(s) de este grupo usan la foto del carnet anterior ('+esc(d.fotoAnterior.join(', '))+'). '+
-      'El sistema solo tiene una copia chica de esa foto y el carnet saldría borroso. Pídale a Claude el PDF COMPLETO de la escuela: lleva la foto original, con la misma nitidez.</div><button class="full" onclick="cerrarVelo()">Entendido</button>');   // 17-11
+    if ((d.fotoAnterior||[]).length && !(await confirmarFotoAnterior_(d.fotoAnterior))) return cerrarVelo();   // P-A 21-11 (Virginia: que Rossy genere sola; antes aquí se detenía)
+    cargando('Preparando carnets…');
     await CARNET.loadFonts(d.assets.fonts);
     var bg={}; for (var g in d.assets.bg) bg[g]=await img(d.assets.bg[g]);
     var inst={corto:d.escuela.corto, oficial:d.escuela.oficial, periodo:d.periodo};
     var cv=document.createElement('canvas'), partes=[], doc=null, n=0, thumbs=[], revisar=[];
     try{ $('barT').textContent='Cargando el preparador de fotos…'; await cargarPreparador(); }catch(e){ throw (/huella|no es el probado/.test(String(e)) ? String(e) : 'No se pudo cargar el preparador de fotos, así que NO se generó el PDF (saldría con la cara pequeña). Revise el internet y vuelva a intentar.'); }
+    var FOTOS_PEDIDAS = pedirFotosDe4_(d.personas);   // O 20-11 (Virginia: «de 8 minutos a 4»)
     for (var i=0;i<d.personas.length;i++){
       var p=d.personas[i];
       if (n===0) doc = await PDFLib.PDFDocument.create();
-      var foto = p.foto ? await img(await srv('fotoAdmin', K, p.foto)) : null, notas = [];
+      var foto = p.foto ? await img(await FOTOS_PEDIDAS.usar(p.foto)) : null, notas = [];   // O 20-11: la foto ya viene pedida de a 4
       // 18-11 (versión L): encuadre, nitidez y tamaño exacto del marco (522 x 638) como la PC. Si falla, no se genera el PDF.
-      if (foto) { $('barT').textContent=(i+1)+' de '+d.personas.length+' · preparando la foto…'; await new Promise(function(r){ setTimeout(r, 30); }); var pf = await FOTO.preparar(foto, {w:522, h:638}); foto = pf.marco; notas = pf.notas.filter(function(t){ return /no se detectó la cara/.test(t); }); }   // 18-11 Virginia: sin avisos nuevos; solo si no hay cara
+      if (foto) { $('barT').textContent=(i+1)+' de '+d.personas.length+' · preparando la foto…'; await new Promise(function(r){ setTimeout(r, 30); }); var pf = await FOTO.preparar(await recortarCaptura_(foto), {w:522, h:638}); foto = pf.marco; notas = pf.notas.filter(function(t){ return /no se detectó la cara/.test(t); }); }   // 18-11 Virginia: sin avisos nuevos; solo si no hay cara
       if (notas.length) revisar.push((i+1)+'. '+p.nombres+' '+p.apellidos+': '+notas.join('; '));
       CARNET.render(cv, bg[CARNET.grupo(p.tipo)], {nombres:p.nombres, apellidos:p.apellidos, nombre:p.nombres+' '+p.apellidos, ci:p.nac+'-'+p.cedula, tipo:p.tipo, cargo:p.cargo}, inst, foto);
       var jpg = cv.toDataURL('image/jpeg', 0.95);
