@@ -98,7 +98,8 @@ function img(src){return new Promise(function(ok,ko){var i=new Image();i.onload=
 function velo(h){$('veloC').innerHTML=h;$('velo').classList.remove('oculto');}
 function cerrarVelo(){$('velo').classList.add('oculto');}
 function cargando(m){velo('<h2>'+esc(m||'Trabajando…')+'</h2><div class="barra"><i id="bar" style="width:20%"></i></div><p class="muted" id="barT"></p>');}
-function fallo(m){velo('<h2>No se pudo</h2><div class="err">'+esc(m)+'</div><button class="full" onclick="cerrarVelo()">Cerrar</button>');}
+function fallo(m){ if (m && typeof m==='object' && !(m instanceof Error) && 'type' in m) m='Error inesperado del navegador ('+m.type+'). Recargue el panel y vuelva a intentar; si se repite, avísele a Claude.';   // R 21-11: nunca más «[object Event]»
+  velo('<h2>No se pudo</h2><div class="err">'+esc(m)+'</div><button class="full" onclick="cerrarVelo()">Cerrar</button>');}
 
 async function arrancar(){ if (!K) { $('hSub').textContent=''; $('app').innerHTML='<div class="card"><div class="err">Falta la clave del panel. Abra el enlace completo que le dio la coordinación (está en el archivo ENLACES_PANEL_PRIVADO).</div></div>'; return; } try{ D = await srv('panel', K); pintar(); }catch(e){ if (/incorrecta/.test(String(e))) { try{ localStorage.removeItem('panel_k'); }catch(x){} e = String(e) + ' Abra el enlace completo que le dio la coordinación (está en el archivo ENLACES_PANEL_PRIVADO).'; } $('app').innerHTML='<div class="card"><div class="err">'+esc(e)+'</div></div>'; } }
 function set(d){ D=d; pintar(); }
@@ -311,9 +312,17 @@ function mmPt(mm){ return mm*72/25.4; }
 // P 21-11 (Virginia: «la foto sirve, pero en el carnet va solo la foto, no el capture»).
 // Si la foto es un capture del teléfono (alta y con franjas oscuras arriba y abajo), se recorta solo la parte de la foto
 // antes de encuadrar la cara. Cualquier otra foto pasa igual que antes.
+// R 21-11 (Virginia: «empieza a cargar las fotos y se cae» con «[object Event]»): si una foto no se puede abrir
+// (vacía, dañada o de iPhone HEIC), el PDF se detiene igual que antes, pero el mensaje dice de QUIÉN es la foto.
+async function fotoDe_(p, pedidas){
+  var quien = (p.nombres+' '+p.apellidos).trim()+' (C.I. '+(p.nac?p.nac+'-':'')+p.cedula+')';
+  var src; try{ src = await pedidas.usar(p.foto); }catch(e){ throw 'No se pudo traer del sistema la foto de '+quien+'. Revise el internet y vuelva a intentar. No se generó el PDF.'; }
+  try{ return await img(src); }
+  catch(e){ throw 'No se pudo abrir la foto de '+quien+'. Puede estar vacía, dañada o ser de iPhone (HEIC). Pídale al director que la suba de nuevo (foto normal JPG), o avísele a Claude. No se generó el PDF.'; }
+}
 async function recortarCaptura_(im){
   recortarCaptura_.dudosa = false;   // Q 21-11: true si la foto es tan alta como un capture y no se pudo recortar (se avisa al final)
-  try{ if (im.decode) await im.decode(); }catch(e){}   // que la foto esté lista antes de medirla
+  try{ if (im.decode) await Promise.race([im.decode(), new Promise(function(r){ setTimeout(r, 1500); })]); }catch(e){}   // que la foto esté lista antes de medirla · R 21-11: máx. 1,5 s (en pestañas en segundo plano decode() puede no terminar nunca)
   var W=im.naturalWidth||im.width, H=im.naturalHeight||im.height;
   if (!W || !H || H/W < 1.9) return im;
   recortarCaptura_.dudosa = true;
@@ -371,7 +380,7 @@ async function pdf(lote){
     for (var i=0;i<d.personas.length;i++){
       var p=d.personas[i];
       if (n===0) doc = await PDFLib.PDFDocument.create();
-      var foto = p.foto ? await img(await FOTOS_PEDIDAS.usar(p.foto)) : null, notas = [];   // O 20-11: la foto ya viene pedida de a 4
+      var foto = p.foto ? await fotoDe_(p, FOTOS_PEDIDAS) : null, notas = [];   // O 20-11: la foto ya viene pedida de a 4 · R 21-11: si no abre, dice de quién es
       // 18-11 (versión L): encuadre, nitidez y tamaño exacto del marco (522 x 638) como la PC. Si falla, no se genera el PDF.
       if (foto) { $('barT').textContent=(i+1)+' de '+d.personas.length+' · preparando la foto…'; await new Promise(function(r){ setTimeout(r, 30); }); var rc = await recortarCaptura_(foto), dud = recortarCaptura_.dudosa; var pf = await FOTO.preparar(rc, {w:522, h:638}); foto = pf.marco; notas = pf.notas.filter(function(t){ return /no se detectó la cara/.test(t); }); if (dud) notas.push('parece un capture y no se pudo recortar'); }   // 18-11 Virginia: sin avisos nuevos; solo si no hay cara
       if (p.fotoAnterior) notas.push('usa la foto del carnet anterior (copia del sistema)');   // Q 21-11: se repite el aviso al final
@@ -413,7 +422,7 @@ async function pdfEscuela(cod){
     for (var i=0;i<d.personas.length;i++){
       var p=d.personas[i];
       if (n===0) doc = await PDFLib.PDFDocument.create();
-      var foto = p.foto ? await img(await FOTOS_PEDIDAS.usar(p.foto)) : null, notas = [];   // O 20-11: la foto ya viene pedida de a 4
+      var foto = p.foto ? await fotoDe_(p, FOTOS_PEDIDAS) : null, notas = [];   // O 20-11: la foto ya viene pedida de a 4 · R 21-11: si no abre, dice de quién es
       // 18-11 (versión L): encuadre, nitidez y tamaño exacto del marco (522 x 638) como la PC. Si falla, no se genera el PDF.
       if (foto) { $('barT').textContent=(i+1)+' de '+d.personas.length+' · preparando la foto…'; await new Promise(function(r){ setTimeout(r, 30); }); var rc = await recortarCaptura_(foto), dud = recortarCaptura_.dudosa; var pf = await FOTO.preparar(rc, {w:522, h:638}); foto = pf.marco; notas = pf.notas.filter(function(t){ return /no se detectó la cara/.test(t); }); if (dud) notas.push('parece un capture y no se pudo recortar'); }   // 18-11 Virginia: sin avisos nuevos; solo si no hay cara
       if (p.fotoAnterior) notas.push('usa la foto del carnet anterior (copia del sistema)');   // Q 21-11: se repite el aviso al final
