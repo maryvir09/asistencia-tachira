@@ -115,10 +115,54 @@ function pintar(){
   var nAl = D.alertas.filter(function(a){return mio(a.municipio);}).length;
   $('hSub').textContent = 'Hola, ' + D.usuario + ' · Última carga del estado de cuenta: ' + (D.ultimaCarga || 'nunca') + textoDoble();
   var nP = {}; D.pagos.forEach(function(p){ nP[p.lote||p.id]=1; });
-  var t=[['pagos','Pagos en espera ('+Object.keys(nP).length+')'],['banco','Cargar estado de cuenta'],['alertas','Alertas ('+nAl+')'],['lotes','Para revisar ('+term+')'],['reporte','Reporte del día'],['enlaces','Enlaces de escuelas']];
+  var t=[['pagos','Pagos en espera ('+Object.keys(nP).length+')'],['recibidos','Pagos recibidos'],['banco','Cargar estado de cuenta'],['alertas','Alertas ('+nAl+')'],['lotes','Para revisar ('+term+')'],['reporte','Reporte del día'],['enlaces','Enlaces de escuelas']];
   var filtro = D.misMunicipios.length ? '<label style="display:flex;gap:6px;align-items:center;font-weight:500;margin:0 0 0 6px"><input type="checkbox" style="width:auto" '+(MIOS?'checked':'')+' onchange="MIOS=this.checked;pintar()"> Solo mis municipios</label>' : '';
   $('tabs').innerHTML = filtro + t.map(function(x){return '<button class="'+(TAB===x[0]?'act':'')+'" onclick="TAB=\''+x[0]+'\';pintar()">'+x[1]+'</button>';}).join('');
-  $('app').innerHTML = ({pagos:vPagos, banco:vBanco, alertas:vAlertas, lotes:vLotes, reporte:vReporte, enlaces:vEnlaces})[TAB]();
+  $('app').innerHTML = ({pagos:vPagos, recibidos:vRecibidos, banco:vBanco, alertas:vAlertas, lotes:vLotes, reporte:vReporte, enlaces:vEnlaces})[TAB]();
+}
+
+// S 21-11 (Virginia): «Pagos recibidos» — todos los pagos que subieron las escuelas por el sistema (no los del Excel),
+// para que Virginia y Rossy vean qué pagó cada escuela y por cuánto. SOLO PARA VER: aquí no hay botones que cambien nada.
+var BUSCA_P = '';
+// La fecha llega como «2026-11-21 16:07» (texto en la hoja) o «21/11/2026 16:07» (si la celda es fecha): se aceptan las dos.
+function fechaOrden_(f){ f = String(f||''); var d = function(x){ return ('0'+(x||'0')).slice(-2); }, m = f.match(/(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{1,2}):(\d{2}))?/); if (m) return m[1]+m[2]+m[3]+d(m[4])+d(m[5]);
+  m = f.match(/(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/); return m ? m[3]+m[2]+m[1]+d(m[4])+d(m[5]) : ''; }
+function cuentaDe_(p){ return p.cuenta ? String(p.cuenta) : (p.origen==='VIEJO' ? 'Formulario viejo (CONTROL)' : '(sin cuenta)'); }
+var NOMBRES_ESC = null;   // código → nombre, se arma una sola vez (revisión S: el buscador iba lento)
+function nombresEsc_(){ if (!NOMBRES_ESC || NOMBRES_ESC.d !== D) { var m = {}; (D.escuelas||[]).forEach(function(x){ m[String(x[0]).toUpperCase().trim()] = String(x[3]||x[2]||''); }); NOMBRES_ESC = { d: D, m: m }; } return NOMBRES_ESC.m; }
+function nombreEsc_(cod){ return nombresEsc_()[String(cod||'').toUpperCase().trim()] || ''; }
+function recibidosMios_(){ return (D.recibidos||[]).filter(function(p){ return mio(p.municipio); }); }
+function listaRecibidos_(){
+  var q = String(BUSCA_P||'').toUpperCase().trim(), et = {'EN ESPERA':'warn','CONFIRMADO':'ok','RECHAZADO':'bad'};
+  var L = recibidosMios_().filter(function(p){ return !q || [p.escuela, nombreEsc_(p.escuela), p.municipio, p.ref, p.lote, cuentaDe_(p), p.monto, bs(p.monto)].join(' ').toUpperCase().indexOf(q)>=0; })
+    .sort(function(a,b){ var x=fechaOrden_(a.fecha), y=fechaOrden_(b.fecha); return x<y?1:x>y?-1:0; });
+  if (!L.length) return '<div class="muted">No hay pagos'+(q?' con «'+esc(BUSCA_P)+'»':'')+'.</div>';
+  var MAX = 300, h = '<div class="muted">'+L.length+' pago(s)'+(L.length>MAX?' · se muestran los '+MAX+' más recientes; escriba en el buscador para encontrar otro':'')+'</div>'+
+    '<table><tr><th>Subido</th><th>Escuela</th><th>Monto</th><th>Carnets</th><th>Referencia</th><th>Fecha del pago</th><th>Banco</th><th>Cuenta</th><th>Estado</th><th></th></tr>';
+  L.slice(0,MAX).forEach(function(p){
+    h += '<tr><td>'+esc(p.fecha)+'</td><td><b>'+esc(p.escuela)+'</b> '+esc(nombreEsc_(p.escuela))+'<div class="muted">'+esc(p.municipio)+(p.lote?' · '+esc(p.lote):'')+'</div></td>'+
+      '<td><b>'+bs(p.monto)+' Bs</b></td><td>'+(p.origen==='COMPLEMENTO'?'complemento (no suma)':esc(String(p.cupos==null?'':p.cupos).replace('.',',')))+'</td><td>'+esc(p.ref)+'</td><td>'+esc(p.fechaPago)+'</td><td>'+esc(p.banco)+'</td><td>'+esc(cuentaDe_(p))+'</td>'+
+      '<td><span class="chip '+(et[p.estado]||'')+'">'+esc(p.estado)+'</span></td><td>'+(p.capture?'<a href="'+esc(p.capture)+'" target="_blank">Ver capture</a>':'')+'</td></tr>';
+  });
+  return h+'</table>';
+}
+function vRecibidos(){
+  if (!D.recibidos) return '<div class="card"><div class="aviso">Esta pestaña necesita la parte nueva del servidor (versión S). Avísele a Claude.</div></div>';
+  var L = recibidosMios_(), hoy = D.hoy ? D.hoy.split('-').reverse().join('/') : '', porC = {}, nE = {}, tot = {n:0,m:0}, tHoy = {n:0,m:0,c:0,e:0}, nViejo = 0;
+  L.forEach(function(p){ nE[p.estado] = (nE[p.estado]||0)+1;
+    // «Subidos hoy»: todo lo que se subió hoy menos lo rechazado (casi todo llega EN ESPERA hasta cargar el banco)
+    if (D.hoy && p.estado!=='RECHAZADO' && fechaOrden_(p.fecha).slice(0,8)===D.hoy.replace(/-/g,'')){ tHoy.n++; tHoy.m += p.monto; if (p.estado==='CONFIRMADO') tHoy.c++; else tHoy.e++; }
+    if (p.estado!=='CONFIRMADO') return;
+    if (p.origen==='VIEJO') nViejo++;
+    var c = cuentaDe_(p); porC[c] = porC[c]||{n:0,m:0}; porC[c].n++; porC[c].m += p.monto; tot.n++; tot.m += p.monto; });
+  return '<div class="card"><h2>Pagos recibidos'+(MIOS && D.misMunicipios.length?' · mis municipios':' · todos los municipios')+'</h2>'+
+    '<div class="bien">Confirmados: '+tot.n+' pago(s) · '+bs(tot.m)+' Bs</div>'+
+    (hoy?'<div class="muted"><b>Subidos hoy ('+hoy+'): '+tHoy.n+' pago(s) · '+bs(tHoy.m)+' Bs</b> ('+tHoy.c+' confirmado(s), '+tHoy.e+' en espera)</div>':'')+
+    Object.keys(porC).sort().map(function(c){ return '<div class="muted">Cuenta '+esc(c)+': '+porC[c].n+' pago(s) confirmados · '+bs(porC[c].m)+' Bs</div>'; }).join('')+
+    '<div class="muted">En espera: '+(nE['EN ESPERA']||0)+' · Rechazados: '+(nE['RECHAZADO']||0)+'</div>'+
+    '<div class="muted">Son los pagos de la hoja Pagos del sistema: los que subieron las escuelas por la página'+(nViejo?' y '+nViejo+' que se pasaron del formulario viejo (CONTROL)':'')+'. No incluye el Excel PAGO_DE_CARNETS / SAN_CRISTOBAL.</div>'+
+    '<input id="buscaP" placeholder="Buscar escuela, código, referencia o monto" value="'+esc(BUSCA_P)+'" oninput="BUSCA_P=this.value;$(\'recLista\').innerHTML=listaRecibidos_()" style="margin-top:8px">'+
+    '<div id="recLista" style="overflow-x:auto;margin-top:8px">'+listaRecibidos_()+'</div></div>';
 }
 
 function vPagos(){
