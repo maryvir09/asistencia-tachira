@@ -177,6 +177,19 @@ function chipLote(l){
 }
 function personasDe(lote){ return D.personas.filter(function(p){return p.lote===lote;}); }
 
+// V (Virginia 28-11 07:15): el botón «Pagar una diferencia» NO sale en los grupos pagados completos
+// (una directora se estresó: «ella decía que está pago»). Pagado completo =
+//  a) tiene pagos (sin contar complementos) y TODOS los vivos están CONFIRMADOS por la coordinación, o
+//  b) no tiene ninguna fila de pago pero la coordinación anotó su pago en el grupo (Lotes col. C: «PAGADO SEGÚN EXCEL…», «P-…-CONTROL…», «Pago previo…»).
+// Revisión 28-11: si un complemento fue RECHAZADO, el botón SÍ sale (la escuela debe poder subirlo de nuevo).
+function pagadoCompleto(l){
+  var esComp=function(t){ return /Complemento C\d+/.test(t.nota||''); };
+  var todos=l.pagos||[];
+  if (todos.some(function(t){ return esComp(t) && t.estado==='RECHAZADO'; })) return false;
+  var vivos=todos.filter(function(t){ return !t.reemplazada && t.estado!=='RECHAZADO' && t.estado!=='ANULADO' && !esComp(t); });
+  if (!todos.length) return !!String(l.pago||'').trim();
+  return vivos.length>0 && vivos.every(function(t){ return t.estado==='CONFIRMADO'; });
+}
 function tarjetaLote(l){
   var ps = personasDe(l.lote), abierto = ['PAGO EN ESPERA','ABIERTO'].indexOf(l.estado)>=0;
   var h = '<div class="card"><div class="fila" style="justify-content:space-between"><h2>'+(l.libresDe?'Cupos pagados libres: '+l.cupos:'Grupo de '+l.cupos+' carnet'+(l.cupos>1?'s':''))+'</h2>'+chipLote(l)+'</div>';
@@ -211,7 +224,7 @@ function tarjetaLote(l){
     var sug = l.estado==='PAGO RECHAZADO' ? ps.length : Math.max(ps.length - l.cupos, 0);
     h += '<button class="sec full" style="margin-top:10px" onclick="formPago(\''+esc(l.lote)+'\','+sug+')">'+(l.estado==='PAGO RECHAZADO'?'Pagar este grupo otra vez':'Pagar más carnets para este grupo')+'</button>';
   }
-  if (l.tipo!=='CORRECCION' && !l.libresDe && l.estado!=='PAGO RECHAZADO' && !/SIN PAGO/i.test(String(l.pago||'')))   // 17-11 noche: diferencia que faltó (p. ej. 1.000 o 2.000 Bs por el cambio de precio)
+  if (l.tipo!=='CORRECCION' && !l.libresDe && l.estado!=='PAGO RECHAZADO' && !/SIN PAGO/i.test(String(l.pago||'')) && !pagadoCompleto(l))   // 17-11 noche: diferencia que faltó (p. ej. 1.000 o 2.000 Bs por el cambio de precio). V (Virginia 28-11): no sale en grupos pagados completos
     h += '<button class="sec full" style="margin-top:8px" onclick="formPago(\''+esc(l.lote)+'\',0,true)">Pagar una diferencia (complemento)</button>';
   if (abierto && ps.length < l.cupos) h += '<button class="full" style="margin-top:10px" onclick="nueva(\''+l.lote+'\')">+ Agregar persona ('+(l.cupos-ps.length)+' cupo'+(l.cupos-ps.length>1?'s':'')+' libre'+(l.cupos-ps.length>1?'s':'')+')</button>';
   if (abierto) {
