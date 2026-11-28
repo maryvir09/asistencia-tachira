@@ -182,6 +182,7 @@ function personasDe(lote){ return D.personas.filter(function(p){return p.lote===
 //  a) tiene pagos (sin contar complementos) y TODOS los vivos están CONFIRMADOS por la coordinación, o
 //  b) no tiene ninguna fila de pago pero la coordinación anotó su pago en el grupo (Lotes col. C: «PAGADO SEGÚN EXCEL…», «P-…-CONTROL…», «Pago previo…»).
 // Revisión 28-11: si un complemento fue RECHAZADO, el botón SÍ sale (la escuela debe poder subirlo de nuevo).
+// V.1 (Virginia 28-11 07:51, «si estamos haciendo esto es para todos»): tampoco sale en los grupos de corrección «…-CORR-…» (aunque su tipo diga NUEVO).
 function pagadoCompleto(l){
   var esComp=function(t){ return /Complemento C\d+/.test(t.nota||''); };
   var todos=l.pagos||[];
@@ -224,7 +225,7 @@ function tarjetaLote(l){
     var sug = l.estado==='PAGO RECHAZADO' ? ps.length : Math.max(ps.length - l.cupos, 0);
     h += '<button class="sec full" style="margin-top:10px" onclick="formPago(\''+esc(l.lote)+'\','+sug+')">'+(l.estado==='PAGO RECHAZADO'?'Pagar este grupo otra vez':'Pagar más carnets para este grupo')+'</button>';
   }
-  if (l.tipo!=='CORRECCION' && !l.libresDe && l.estado!=='PAGO RECHAZADO' && !/SIN PAGO/i.test(String(l.pago||'')) && !pagadoCompleto(l))   // 17-11 noche: diferencia que faltó (p. ej. 1.000 o 2.000 Bs por el cambio de precio). V (Virginia 28-11): no sale en grupos pagados completos
+  if (l.tipo!=='CORRECCION' && !l.libresDe && l.estado!=='PAGO RECHAZADO' && !/-CORR-/.test(String(l.lote||'')) && !/SIN PAGO/i.test(String(l.pago||'')) && !pagadoCompleto(l))   // 17-11 noche: diferencia que faltó (p. ej. 1.000 o 2.000 Bs por el cambio de precio). V (Virginia 28-11): no sale en grupos pagados completos
     h += '<button class="sec full" style="margin-top:8px" onclick="formPago(\''+esc(l.lote)+'\',0,true)">Pagar una diferencia (complemento)</button>';
   if (abierto && ps.length < l.cupos) h += '<button class="full" style="margin-top:10px" onclick="nueva(\''+l.lote+'\')">+ Agregar persona ('+(l.cupos-ps.length)+' cupo'+(l.cupos-ps.length>1?'s':'')+' libre'+(l.cupos-ps.length>1?'s':'')+')</button>';
   if (abierto) {
